@@ -1,0 +1,30 @@
+name: Build Zen Blocks Android APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate Android platform
+        run: flutter create --platforms=android --org com.zenblocks.nature .
+      - name: Install dependencies
+        run: flutter pub get
+      - name: Run unit tests
+        run: flutter test
+      - name: Build APK
+        run: flutter build apk --debug
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ZenBlocks-Nature-Android-APK
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 14
