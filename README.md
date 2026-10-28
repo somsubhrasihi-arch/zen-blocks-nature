@@ -1,6 +1,6 @@
-# Zen Blocks — Nature Calm
+# Zen Blocks — Neon Aurora
 
-An original nature-themed falling-block puzzle for Android, built with Flutter.
+An original falling-block puzzle for Android, built with Flutter and a Neon Aurora visual theme.
 
 ## Features
 - Seven classic geometric tetromino shapes with a randomized 7-piece bag
@@ -11,7 +11,8 @@ An original nature-themed falling-block puzzle for Android, built with Flutter.
 - Pause/resume and automatic pause when leaving the app
 - Persistent personal best, sound and vibration settings
 - Works offline, no account, ads or tracking
-- Nature Calm forest palette and softly highlighted blocks
+- Glowing gradient blocks, an animated aurora sky and stars
+- Five aurora palettes that change every 10 levels, line-clear sparkles and a persistent Spectacular effects toggle
 
 ## Prerequisites
 Install Flutter SDK (stable) and Android Studio / Android SDK, accept Android SDK licenses, and configure a device or emulator. Check with:
@@ -27,6 +28,7 @@ The ZIP includes all authored game source code, assets configuration and tests. 
 ```bash
 flutter create --platforms=android --org com.zenblocks.nature .
 flutter pub get
+rm -f test/widget_test.dart
 flutter test
 ```
 
@@ -85,4 +87,7 @@ The sound toggle enables/disables Flutter's platform system click when scoring. 
 - Package dependency resolution fails: ensure network access to pub.dev and rerun `flutter pub get`.
 
 ## Limitations
-This is an initial playable prototype. It has no online leaderboard, cloud sync, background soundtrack, animated line-clear particles or production signing. Scores are saved on the device only. No APK is included because this environment has no Flutter/Android SDK to compile or test one.
+This is a playable prototype. It has no online leaderboard, cloud sync, background soundtrack or production signing. Scores are saved on the device only.
+
+## Android APK workflow
+The existing `.github/workflows/build-apk.yml` is preserved. A push to `main` or a manual run of **Build Zen Blocks Android APK** generates Android scaffolding, removes the generated default widget test, runs the project tests and builds a debug APK. Download the **ZenBlocks-Nature-Android-APK** artifact and extract `app-debug.apk`. The artifact name and Android organization (`com.zenblocks.nature`) remain unchanged. See [MOBILE_GITHUB_BUILD.md](MOBILE_GITHUB_BUILD.md) for phone instructions.
