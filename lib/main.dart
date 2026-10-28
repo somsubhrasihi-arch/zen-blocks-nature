@@ -39,10 +39,11 @@ class GameScreen extends StatefulWidget {
   State<GameScreen> createState() => _GameScreenState();
 }
 
-class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, TickerProviderStateMixin {
   late final AnimationController aurora;
   int lastLines = 0;
-  int burstSerial = 0;
+  late final AnimationController burst;
+  bool _foreground = true;
   bool effectsEnabled = true;
   final ZenGame game = ZenGame();
   Timer? timer;
@@ -56,6 +57,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Si
   void initState() {
     super.initState();
     aurora = AnimationController(vsync: this, duration: const Duration(seconds: 8))..repeat();
+    burst = AnimationController(vsync: this, duration: const Duration(milliseconds: 650));
     WidgetsBinding.instance.addObserver(this);
     game.addListener(_onGameChanged);
     _loadSettings();
@@ -71,6 +73,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Si
       vibrationEnabled = prefs.getBool('vibrationEnabled') ?? true;
       effectsEnabled = prefs.getBool('effectsEnabled') ?? true;
     });
+    _syncAnimations();
   }
 
   Future<void> _saveSettings() async {
@@ -82,10 +85,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Si
 
   void _onGameChanged() {
     if (game.lines > lastLines) {
-      burstSerial++;
+      if (effectsEnabled && _foreground && !game.paused) burst.forward(from: 0);
       if (vibrationEnabled) HapticFeedback.heavyImpact();
     }
+    if (!game.started || game.over) burst.reset();
     lastLines = game.lines;
+    _syncAnimations();
     if (game.score > highScore) {
       highScore = game.score;
       SharedPreferences.getInstance().then((p) => p.setInt('highScore', highScore));
@@ -115,11 +120,33 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Si
     _scheduleTick();
   }
 
+  void _syncAnimations() {
+    final animate = effectsEnabled && _foreground && !game.paused;
+    if (animate) {
+      if (!aurora.isAnimating) aurora.repeat();
+      if (burst.value > 0 && burst.value < 1 && !burst.isAnimating) {
+        burst.forward();
+      }
+    } else {
+      aurora.stop();
+      burst.stop();
+      if (!effectsEnabled) burst.reset();
+    }
+  }
+
+  void _setEffectsEnabled(bool value) {
+    setState(() => effectsEnabled = value);
+    _syncAnimations();
+    _saveSettings();
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    _foreground = state == AppLifecycleState.resumed;
     if (state != AppLifecycleState.resumed && game.started && !game.paused && !game.over) {
       game.togglePause();
     }
+    _syncAnimations();
   }
 
   @override
@@ -127,6 +154,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Si
     WidgetsBinding.instance.removeObserver(this);
     timer?.cancel();
     aurora.dispose();
+    burst.dispose();
     game.removeListener(_onGameChanged);
     game.dispose();
     super.dispose();
@@ -160,7 +188,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Si
             update(() => vibrationEnabled = v); setState(() {}); _saveSettings();
           }),
           SwitchListTile(title: const Text('Spectacular effects'), value: effectsEnabled, onChanged: (v) {
-            update(() => effectsEnabled = v); setState(() {}); _saveSettings();
+            update(() => _setEffectsEnabled(v));
           }),
           const Padding(padding: EdgeInsets.all(12), child: Text('Audio uses the device system click. No background music is bundled.',
             textAlign: TextAlign.center, style: TextStyle(color: muted, fontSize: 12))),
@@ -169,9 +197,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Si
   @override
   Widget build(BuildContext context) {
     final next = game.nextKind;
-    return Scaffold(body: AnimatedBuilder(animation: aurora, builder: (context, _) => Container(
+    return Scaffold(body: Container(
       decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF090B31), Color(0xFF251054), Color(0xFF071638)])),
-      child: Stack(children: [Positioned.fill(child: IgnorePointer(child: CustomPaint(painter: AuroraPainter(aurora.value, game.level, effectsEnabled)))),
+      child: Stack(children: [Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: AuroraPainter(aurora, game.level, effectsEnabled))))),
       SafeArea(child: LayoutBuilder(builder: (context, constraints) {
       final available = constraints.maxHeight;
       final boardHeightPx = (available - 290).clamp(250.0, 620.0);
@@ -203,8 +231,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Si
                   decoration: BoxDecoration(color: const Color(0xE8081031), borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: const Color(0xFF38D8FF), width: 2)),
                   clipBehavior: Clip.antiAlias, child: Stack(children: [
-                    CustomPaint(painter: BoardPainter(game.visibleBoard), size: Size.infinite),
-                    if (effectsEnabled && game.started) Positioned.fill(child: IgnorePointer(child: CustomPaint(painter: SparkPainter(aurora.value, burstSerial)))),
+                    RepaintBoundary(child: CustomPaint(painter: BoardPainter(game.visibleBoard), size: Size.infinite)),
+                    if (effectsEnabled && game.started) Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: SparkPainter(burst))))),
                     if (!game.started || game.paused || game.over)
                       Container(color: const Color(0xE9091030), alignment: Alignment.center,
                         child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -244,7 +272,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Si
           const Text('Tap board to rotate  •  Swipe down to drop',
             style: TextStyle(color: muted, fontSize: 11)),
         ])));
-    })) ]))));
+    })) ])));
   }
 }
 
@@ -280,13 +308,13 @@ void drawBlock(Canvas canvas, Rect rect, Color color) {
 }
 
 class AuroraPainter extends CustomPainter {
-  AuroraPainter(this.t, this.level, this.enabled);
-  final double t;
+  AuroraPainter(this.animation, this.level, this.enabled) : super(repaint: animation);
+  final Animation<double> animation;
   final int level;
   final bool enabled;
   @override
   void paint(Canvas canvas, Size size) {
-    final phase = enabled ? t * math.pi * 2 : 0.0;
+    final phase = enabled ? animation.value * math.pi * 2 : 0.0;
     final palettes = <List<Color>>[
       [const Color(0xFF00DFFF), const Color(0xFFAB47FF)],
       [const Color(0xFF00FFC8), const Color(0xFF5C89FF)],
@@ -302,25 +330,43 @@ class AuroraPainter extends CustomPainter {
         ..shader = RadialGradient(colors: [colors[i % 2].withValues(alpha: .25), Colors.transparent])
             .createShader(Rect.fromCircle(center: Offset(x, y), radius: size.width * .46)));
     }
-    final star = Paint()..color = Colors.white.withValues(alpha: .65);
+    // Visible, flowing light ribbons; repainting them does not rebuild the game UI.
+    for (var ribbon = 0; ribbon < 2; ribbon++) {
+      final path = Path();
+      final base = size.height * (.18 + ribbon * .22);
+      for (var step = 0; step <= 32; step++) {
+        final x = size.width * step / 32;
+        final y = base + math.sin(step / 32 * math.pi * 2 + phase + ribbon * 2) * size.height * .055;
+        if (step == 0) { path.moveTo(x, y); } else { path.lineTo(x, y); }
+      }
+      path.lineTo(size.width, base + size.height * .16);
+      path.lineTo(0, base + size.height * .16);
+      path.close();
+      canvas.drawPath(path, Paint()..shader = LinearGradient(
+        begin: Alignment.topCenter, end: Alignment.bottomCenter,
+        colors: [colors[ribbon].withValues(alpha: .18), Colors.transparent],
+      ).createShader(Rect.fromLTWH(0, base - size.height * .055, size.width, size.height * .215)));
+    }
+    final star = Paint();
     for (var i = 0; i < 65; i++) {
       final x = ((i * 97 + 29) % 397) / 397 * size.width;
       final y = ((i * 131 + 17) % 601) / 601 * size.height;
+      final alpha = enabled ? .35 + .3 * (1 + math.sin(phase + i * 1.7)) / 2 : .5;
+      star.color = Colors.white.withValues(alpha: alpha);
       canvas.drawCircle(Offset(x, y), i % 7 == 0 ? 1.3 : .65, star);
     }
   }
   @override
-  bool shouldRepaint(covariant AuroraPainter old) => old.t != t || old.level != level || old.enabled != enabled;
+  bool shouldRepaint(covariant AuroraPainter old) => old.animation != animation || old.level != level || old.enabled != enabled;
 }
 
 class SparkPainter extends CustomPainter {
-  SparkPainter(this.t, this.serial);
-  final double t;
-  final int serial;
+  SparkPainter(this.animation) : super(repaint: animation);
+  final Animation<double> animation;
   @override
   void paint(Canvas canvas, Size size) {
-    if (serial == 0) return;
-    final progress = (t * 3) % 1;
+    final progress = animation.value;
+    if (progress <= 0 || progress >= 1) return;
     for (var i = 0; i < 24; i++) {
       final a = i * math.pi * 2 / 24;
       final distance = 15 + progress * size.width * .48;
@@ -330,7 +376,7 @@ class SparkPainter extends CustomPainter {
     }
   }
   @override
-  bool shouldRepaint(covariant SparkPainter old) => old.t != t || old.serial != serial;
+  bool shouldRepaint(covariant SparkPainter old) => old.animation != animation;
 }
 
 class NextPainter extends CustomPainter {
