@@ -3,6 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zen_blocks/joystick.dart';
 import 'package:zen_blocks/main.dart';
+import 'package:zen_blocks/game_audio.dart';
+import 'fake_audio.dart';
 
 void main() {
   testWidgets('holding moves repeatedly and release stops movement', (tester) async {
@@ -65,7 +67,7 @@ void main() {
 
   testWidgets('saved button preference keeps original controls available', (tester) async {
     SharedPreferences.setMockInitialValues({'joystickEnabled': false});
-    await tester.pumpWidget(const ZenBlocksApp());
+    await tester.pumpWidget(ZenBlocksApp(audio: GameAudio(backend: FakeAudioBackend())));
     await tester.pump();
     expect(find.byType(GameJoystick), findsNothing);
     expect(find.text('LEFT'), findsOneWidget);
@@ -76,7 +78,7 @@ void main() {
 
   testWidgets('joystick moves pieces while gravity continues falling', (tester) async {
     SharedPreferences.setMockInitialValues({});
-    await tester.pumpWidget(const ZenBlocksApp());
+    await tester.pumpWidget(ZenBlocksApp(audio: GameAudio(backend: FakeAudioBackend())));
     await tester.pump();
     await tester.tap(find.text('Start playing'));
     await tester.pump();

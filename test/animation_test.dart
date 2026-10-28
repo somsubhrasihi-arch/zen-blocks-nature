@@ -4,12 +4,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zen_blocks/game.dart';
 import 'package:zen_blocks/main.dart';
+import 'package:zen_blocks/game_audio.dart';
+import 'fake_audio.dart';
 
 Future<void> mountGame(WidgetTester tester) async {
   SharedPreferences.setMockInitialValues({});
   await tester.binding.setSurfaceSize(const Size(412, 900));
   addTearDown(() => tester.binding.setSurfaceSize(null));
-  await tester.pumpWidget(const ZenBlocksApp());
+  await tester.pumpWidget(ZenBlocksApp(audio: GameAudio(backend: FakeAudioBackend())));
   await tester.pump();
   await tester.tap(find.text('Start playing'));
   await tester.pump();

@@ -31,6 +31,7 @@ class ZenGame extends ChangeNotifier {
   Piece? active;
   int? nextKind;
   int score = 0;
+  int piecesLocked = 0;
   int lines = 0;
   int level = 1;
   int combo = -1;
@@ -51,6 +52,7 @@ class ZenGame extends ChangeNotifier {
   void reset() {
     board = List.generate(boardHeight, (_) => List.filled(boardWidth, 0));
     score = 0;
+    piecesLocked = 0;
     lines = 0;
     level = 1;
     combo = -1;
@@ -171,6 +173,7 @@ class ZenGame extends ChangeNotifier {
         board[y][p.x + c] = p.kind + 1;
       }
     }
+    piecesLocked++;
     final remaining = board.where((row) => row.any((v) => v == 0)).toList();
     final cleared = boardHeight - remaining.length;
     if (cleared > 0) {

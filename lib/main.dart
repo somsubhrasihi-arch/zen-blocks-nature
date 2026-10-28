@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'game.dart';
 import 'joystick.dart';
+import 'game_audio.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,19 +24,21 @@ const blockColors = <Color>[
 ];
 
 class ZenBlocksApp extends StatelessWidget {
-  const ZenBlocksApp({super.key});
+  const ZenBlocksApp({super.key, this.audio});
+  final GameAudio? audio;
   @override
   Widget build(BuildContext context) => MaterialApp(
         title: 'Zen Blocks',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(useMaterial3: true, brightness: Brightness.dark,
           scaffoldBackgroundColor: forest, colorSchemeSeed: const Color(0xFF9ECFC0)),
-        home: const GameScreen(),
+        home: GameScreen(audio: audio),
       );
 }
 
 class GameScreen extends StatefulWidget {
-  const GameScreen({super.key});
+  const GameScreen({super.key, this.audio});
+  final GameAudio? audio;
   @override
   State<GameScreen> createState() => _GameScreenState();
 }
@@ -50,16 +53,19 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   bool effectsEnabled = true;
   bool joystickEnabled = true;
   final ZenGame game = ZenGame();
+  late final GameAudio audio;
+  bool musicEnabled = true;
   Timer? timer;
   int highScore = 0;
   bool soundEnabled = true;
   bool vibrationEnabled = true;
-  int _lastScore = 0;
   bool _wasOver = false;
 
   @override
   void initState() {
     super.initState();
+    audio = widget.audio ?? GameAudio();
+    unawaited(audio.prepare());
     aurora = AnimationController(vsync: this, duration: const Duration(seconds: 8))..repeat();
     burst = AnimationController(vsync: this, duration: const Duration(milliseconds: 650))
       ..addStatusListener((status) {
@@ -77,16 +83,19 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     setState(() {
       highScore = prefs.getInt('highScore') ?? 0;
       soundEnabled = prefs.getBool('soundEnabled') ?? true;
+      musicEnabled = prefs.getBool('musicEnabled') ?? true;
       vibrationEnabled = prefs.getBool('vibrationEnabled') ?? true;
       effectsEnabled = prefs.getBool('effectsEnabled') ?? true;
       joystickEnabled = prefs.getBool('joystickEnabled') ?? true;
     });
     _syncAnimations();
+    _syncAudio();
   }
 
   Future<void> _saveSettings() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('soundEnabled', soundEnabled);
+    await prefs.setBool('musicEnabled', musicEnabled);
     await prefs.setBool('vibrationEnabled', vibrationEnabled);
     await prefs.setBool('effectsEnabled', effectsEnabled);
     await prefs.setBool('joystickEnabled', joystickEnabled);
@@ -113,13 +122,21 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       highScore = game.score;
       SharedPreferences.getInstance().then((p) => p.setInt('highScore', highScore));
     }
-    if (game.score > _lastScore && soundEnabled && game.started) {
-      SystemSound.play(SystemSoundType.click);
-    }
+    _syncAudio();
     if (game.over && !_wasOver && vibrationEnabled) HapticFeedback.mediumImpact();
     _wasOver = game.over;
-    _lastScore = game.score;
     if (mounted) setState(() {});
+  }
+
+  void _syncAudio() {
+    unawaited(audio.sync(game, musicEnabled: musicEnabled,
+      effectsEnabled: soundEnabled, foreground: _foreground));
+  }
+
+  void _rotate() {
+    final before = game.active?.cells;
+    game.rotate();
+    if (!identical(before, game.active?.cells)) unawaited(audio.rotate());
   }
 
   void _scheduleTick() {
@@ -172,6 +189,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       game.togglePause();
     }
     _syncAnimations();
+    _syncAudio();
   }
 
   @override
@@ -183,6 +201,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     burst.dispose();
     game.removeListener(_onGameChanged);
     game.dispose();
+    unawaited(audio.dispose());
     super.dispose();
   }
 
@@ -204,11 +223,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   );
 
   void _showSettings() => showModalBottomSheet<void>(context: context, backgroundColor: panel,
-    showDragHandle: true, builder: (context) => StatefulBuilder(builder: (context, update) =>
-      SafeArea(child: Padding(padding: const EdgeInsets.all(20), child: Column(mainAxisSize: MainAxisSize.min,
+    showDragHandle: true, isScrollControlled: true, builder: (context) => StatefulBuilder(builder: (context, update) =>
+      SafeArea(child: SingleChildScrollView(child: Padding(padding: const EdgeInsets.all(20), child: Column(mainAxisSize: MainAxisSize.min,
         children: [const Text('Aurora settings', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-          SwitchListTile(title: const Text('Gentle sound effects'), value: soundEnabled, onChanged: (v) {
-            update(() => soundEnabled = v); setState(() {}); _saveSettings();
+          SwitchListTile(title: const Text('Background music'), value: musicEnabled, onChanged: (v) {
+            update(() => musicEnabled = v); setState(() {}); _syncAudio(); _saveSettings();
+          }),
+          SwitchListTile(title: const Text('Game sound effects'), value: soundEnabled, onChanged: (v) {
+            update(() => soundEnabled = v); setState(() {}); _syncAudio(); _saveSettings();
           }),
           SwitchListTile(title: const Text('Touch vibration'), value: vibrationEnabled, onChanged: (v) {
             update(() => vibrationEnabled = v); setState(() {}); _saveSettings();
@@ -219,10 +241,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
           SwitchListTile(title: const Text('Spectacular effects'), value: effectsEnabled, onChanged: (v) {
             update(() => _setEffectsEnabled(v));
           }),
-          const Text('Neon Aurora · 1.0.1', style: TextStyle(color: muted, fontSize: 12)),
-          const Padding(padding: EdgeInsets.all(12), child: Text('Audio uses the device system click. No background music is bundled.',
+          const Text('Neon Aurora · 1.1.0', style: TextStyle(color: muted, fontSize: 12)),
+          const Padding(padding: EdgeInsets.all(12), child: Text('Original ambient music and game sounds are bundled for offline play. Music pauses when the game is paused or the app is in the background.',
             textAlign: TextAlign.center, style: TextStyle(color: muted, fontSize: 12))),
-        ])))));
+        ]))))));
 
   @override
   Widget build(BuildContext context) {
@@ -232,8 +254,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       child: Stack(children: [Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: AuroraPainter(aurora, game.level, effectsEnabled))))),
       SafeArea(child: LayoutBuilder(builder: (context, constraints) {
       final available = constraints.maxHeight;
-      final boardHeightPx = (available - (joystickEnabled ? 350 : 290)).clamp(200.0, 620.0);
-      return SingleChildScrollView(child: Padding(padding: const EdgeInsets.fromLTRB(16, 10, 16, 20),
+      final boardHeightPx = (available - (joystickEnabled ? 290 : 230)).clamp(200.0, 900.0);
+      return SingleChildScrollView(child: Padding(padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
         child: Column(children: [
           Row(children: [const Icon(Icons.auto_awesome_rounded, color: Color(0xFF25E5FF), size: 28),
             const SizedBox(width: 8), const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
@@ -244,10 +266,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
               icon: Icon(game.paused ? Icons.play_arrow_rounded : Icons.pause_rounded, color: cream))]),
           const SizedBox(height: 14),
           Row(children: [_stat('Score', '${game.score}'), const SizedBox(width: 8),
-            _stat('Level', '${game.level}'), const SizedBox(width: 8), _stat('Best', '$highScore')]),
+            _stat('Level', '${game.level}'), const SizedBox(width: 8), _stat('Best', '$highScore'),
+            const SizedBox(width: 8), SizedBox(width: 62, child: Column(children: [
+              const Text('NEXT', style: TextStyle(color: muted, fontSize: 10, letterSpacing: 1.5)),
+              SizedBox(height: 44, width: 62, child: CustomPaint(painter: NextPainter(next))),
+            ]))]),
           const SizedBox(height: 12),
-          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Expanded(child: Center(child: GestureDetector(
+          Center(child: GestureDetector(
               onHorizontalDragEnd: (details) {
                 if ((details.primaryVelocity ?? 0) > 0) _act(() => game.move(1, 0));
                 if ((details.primaryVelocity ?? 0) < 0) _act(() => game.move(-1, 0));
@@ -255,7 +280,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
               onVerticalDragEnd: (details) {
                 if ((details.primaryVelocity ?? 0) > 0) _act(game.hardDrop);
               },
-              onTap: () => _act(game.rotate),
+              onTap: () => _act(_rotate),
               child: SizedBox(width: boardHeightPx / 2, child: AspectRatio(aspectRatio: boardWidth / boardHeight,
                 child: Container(constraints: BoxConstraints(maxHeight: boardHeightPx),
                   decoration: BoxDecoration(color: const Color(0xE8081031), borderRadius: BorderRadius.circular(12),
@@ -276,39 +301,23 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
                           }), child: Text(game.paused ? 'Resume' : game.over ? 'Play again' : 'Start playing')),
                         ])),
                   ])))),
-            ))),
-            const SizedBox(width: 12),
-            SizedBox(width: 86, child: Column(children: [
-              Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: panel, borderRadius: BorderRadius.circular(12)),
-                child: Column(children: [const Text('NEXT', style: TextStyle(fontSize: 11, color: muted, letterSpacing: 2)),
-                  const SizedBox(height: 10), SizedBox(height: 64, width: 72,
-                    child: CustomPaint(painter: NextPainter(next), size: Size.infinite))])),
-              const SizedBox(height: 14), const Icon(Icons.emoji_events_outlined, color: Color(0xFFFFC247)),
-              const Text('BEST', style: TextStyle(color: muted, fontSize: 10, letterSpacing: 1.5)),
-              Text('$highScore', style: const TextStyle(color: cream, fontSize: 16, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 18), Text('10 lines\nper level', textAlign: TextAlign.center,
-                style: TextStyle(color: muted.withValues(alpha: 0.8), fontSize: 11)),
-            ])),
-          ]),
+            )),
           const SizedBox(height: 14),
           if (joystickEnabled) Row(children: [
             GameJoystick(enabled: game.canMove,
               onLeft: () => game.move(-1, 0),
               onRight: () => game.move(1, 0),
-              onDown: game.softDrop, onRotate: game.rotate),
+              onDown: game.softDrop, onRotate: _rotate),
             const SizedBox(width: 12),
-            _control(Icons.rotate_right_rounded, 'ROTATE', game.rotate),
+            _control(Icons.rotate_right_rounded, 'ROTATE', _rotate),
             _control(Icons.keyboard_double_arrow_down_rounded, 'DROP', game.hardDrop),
           ]) else Row(children: [
             _control(Icons.arrow_back_rounded, 'LEFT', () => game.move(-1, 0)),
-            _control(Icons.rotate_right_rounded, 'ROTATE', game.rotate),
+            _control(Icons.rotate_right_rounded, 'ROTATE', _rotate),
             _control(Icons.arrow_forward_rounded, 'RIGHT', () => game.move(1, 0)),
             _control(Icons.arrow_downward_rounded, 'DOWN', game.softDrop),
             _control(Icons.keyboard_double_arrow_down_rounded, 'DROP', game.hardDrop),
           ]),
-          const SizedBox(height: 10),
-          Text(joystickEnabled ? 'Hold joystick to move • Up rotates • Down soft drops' : 'Tap board to rotate  •  Swipe down to drop',
-            textAlign: TextAlign.center, style: const TextStyle(color: muted, fontSize: 11)),
         ])));
     })) ])));
   }
