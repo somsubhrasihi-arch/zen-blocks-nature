@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'game.dart';
+import 'joystick.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,6 +46,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   late final AnimationController burst;
   bool _foreground = true;
   bool effectsEnabled = true;
+  bool joystickEnabled = true;
   final ZenGame game = ZenGame();
   Timer? timer;
   int highScore = 0;
@@ -72,6 +74,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       soundEnabled = prefs.getBool('soundEnabled') ?? true;
       vibrationEnabled = prefs.getBool('vibrationEnabled') ?? true;
       effectsEnabled = prefs.getBool('effectsEnabled') ?? true;
+      joystickEnabled = prefs.getBool('joystickEnabled') ?? true;
     });
     _syncAnimations();
   }
@@ -81,6 +84,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     await prefs.setBool('soundEnabled', soundEnabled);
     await prefs.setBool('vibrationEnabled', vibrationEnabled);
     await prefs.setBool('effectsEnabled', effectsEnabled);
+    await prefs.setBool('joystickEnabled', joystickEnabled);
   }
 
   void _onGameChanged() {
@@ -187,6 +191,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
           SwitchListTile(title: const Text('Touch vibration'), value: vibrationEnabled, onChanged: (v) {
             update(() => vibrationEnabled = v); setState(() {}); _saveSettings();
           }),
+          SwitchListTile(title: const Text('Joystick controls'), value: joystickEnabled, onChanged: (v) {
+            update(() => joystickEnabled = v); setState(() {}); _saveSettings();
+          }),
           SwitchListTile(title: const Text('Spectacular effects'), value: effectsEnabled, onChanged: (v) {
             update(() => _setEffectsEnabled(v));
           }),
@@ -202,7 +209,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       child: Stack(children: [Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: AuroraPainter(aurora, game.level, effectsEnabled))))),
       SafeArea(child: LayoutBuilder(builder: (context, constraints) {
       final available = constraints.maxHeight;
-      final boardHeightPx = (available - 290).clamp(250.0, 620.0);
+      final boardHeightPx = (available - (joystickEnabled ? 350 : 290)).clamp(200.0, 620.0);
       return SingleChildScrollView(child: Padding(padding: const EdgeInsets.fromLTRB(16, 10, 16, 20),
         child: Column(children: [
           Row(children: [const Icon(Icons.auto_awesome_rounded, color: Color(0xFF25E5FF), size: 28),
@@ -226,7 +233,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
                 if ((details.primaryVelocity ?? 0) > 0) _act(game.hardDrop);
               },
               onTap: () => _act(game.rotate),
-              child: AspectRatio(aspectRatio: boardWidth / boardHeight,
+              child: SizedBox(width: boardHeightPx / 2, child: AspectRatio(aspectRatio: boardWidth / boardHeight,
                 child: Container(constraints: BoxConstraints(maxHeight: boardHeightPx),
                   decoration: BoxDecoration(color: const Color(0xE8081031), borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: const Color(0xFF38D8FF), width: 2)),
@@ -245,7 +252,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
                             if (game.paused) { game.togglePause(); } else { game.start(); }
                           }), child: Text(game.paused ? 'Resume' : game.over ? 'Play again' : 'Start playing')),
                         ])),
-                  ]))),
+                  ])))),
             ))),
             const SizedBox(width: 12),
             SizedBox(width: 86, child: Column(children: [
@@ -261,7 +268,15 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
             ])),
           ]),
           const SizedBox(height: 14),
-          Row(children: [
+          if (joystickEnabled) Row(children: [
+            GameJoystick(enabled: game.canMove,
+              onLeft: () => game.move(-1, 0),
+              onRight: () => game.move(1, 0),
+              onDown: game.softDrop, onRotate: game.rotate),
+            const SizedBox(width: 12),
+            _control(Icons.rotate_right_rounded, 'ROTATE', game.rotate),
+            _control(Icons.keyboard_double_arrow_down_rounded, 'DROP', game.hardDrop),
+          ]) else Row(children: [
             _control(Icons.arrow_back_rounded, 'LEFT', () => game.move(-1, 0)),
             _control(Icons.rotate_right_rounded, 'ROTATE', game.rotate),
             _control(Icons.arrow_forward_rounded, 'RIGHT', () => game.move(1, 0)),
@@ -269,8 +284,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
             _control(Icons.keyboard_double_arrow_down_rounded, 'DROP', game.hardDrop),
           ]),
           const SizedBox(height: 10),
-          const Text('Tap board to rotate  •  Swipe down to drop',
-            style: TextStyle(color: muted, fontSize: 11)),
+          Text(joystickEnabled ? 'Hold joystick to move • Up rotates • Down soft drops' : 'Tap board to rotate  •  Swipe down to drop',
+            textAlign: TextAlign.center, style: const TextStyle(color: muted, fontSize: 11)),
         ])));
     })) ])));
   }
