@@ -41,6 +41,13 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
     expect(sparksOf(tester).animation.value, inExclusiveRange(0, 1));
+    game.togglePause();
+    await tester.pump();
+    final paused = sparksOf(tester).animation.value;
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(sparksOf(tester).animation.value, paused);
+    game.togglePause();
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
     expect(sparksOf(tester).animation.status, AnimationStatus.completed);
     await tester.pump(const Duration(seconds: 3));
@@ -67,6 +74,7 @@ void main() {
     expect(aurora.value, isNot(initial));
     expect(identical(tester.widget(board), before), isTrue);
     await tester.tap(find.byTooltip('Settings'));
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
     await tester.tap(find.text('Spectacular effects'));
     await tester.pump();
