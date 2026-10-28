@@ -44,6 +44,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   late final AnimationController aurora;
   int lastLines = 0;
   late final AnimationController burst;
+  bool burstVisible = false;
+  Timer? burstExpiry;
   bool _foreground = true;
   bool effectsEnabled = true;
   bool joystickEnabled = true;
@@ -59,7 +61,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   void initState() {
     super.initState();
     aurora = AnimationController(vsync: this, duration: const Duration(seconds: 8))..repeat();
-    burst = AnimationController(vsync: this, duration: const Duration(milliseconds: 650));
+    burst = AnimationController(vsync: this, duration: const Duration(milliseconds: 650))
+      ..addStatusListener((status) {
+        if (status == AnimationStatus.completed) _hideBurst();
+      });
     WidgetsBinding.instance.addObserver(this);
     game.addListener(_onGameChanged);
     _loadSettings();
@@ -89,10 +94,19 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
 
   void _onGameChanged() {
     if (game.lines > lastLines) {
-      if (effectsEnabled && _foreground && !game.paused) burst.forward(from: 0);
+      if (effectsEnabled && _foreground && !game.paused) {
+        burstVisible = true;
+        burst.forward(from: 0);
+        burstExpiry?.cancel();
+        // Remove the overlay even if the animation ticker stalls on a device.
+        burstExpiry = Timer(const Duration(milliseconds: 700), _hideBurst);
+      }
       if (vibrationEnabled) HapticFeedback.heavyImpact();
     }
-    if (!game.started || game.over) burst.reset();
+    if (!game.started || game.over) {
+      _hideBurst();
+      burst.reset();
+    }
     lastLines = game.lines;
     _syncAnimations();
     if (game.score > highScore) {
@@ -124,16 +138,23 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     _scheduleTick();
   }
 
+  void _hideBurst() {
+    burstExpiry?.cancel();
+    burstExpiry = null;
+    burst.stop();
+    if (mounted && burstVisible) setState(() => burstVisible = false);
+  }
+
   void _syncAnimations() {
     final animate = effectsEnabled && _foreground && !game.paused;
     if (animate) {
       if (!aurora.isAnimating) aurora.repeat();
-      if (burst.value > 0 && burst.value < 1 && !burst.isAnimating) {
+      if (burstVisible && burst.value > 0 && burst.value < 1 && !burst.isAnimating) {
         burst.forward();
       }
     } else {
       aurora.stop();
-      burst.stop();
+      _hideBurst();
       if (!effectsEnabled) burst.reset();
     }
   }
@@ -157,6 +178,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     timer?.cancel();
+    burstExpiry?.cancel();
     aurora.dispose();
     burst.dispose();
     game.removeListener(_onGameChanged);
@@ -197,6 +219,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
           SwitchListTile(title: const Text('Spectacular effects'), value: effectsEnabled, onChanged: (v) {
             update(() => _setEffectsEnabled(v));
           }),
+          const Text('Neon Aurora · 1.0.1', style: TextStyle(color: muted, fontSize: 12)),
           const Padding(padding: EdgeInsets.all(12), child: Text('Audio uses the device system click. No background music is bundled.',
             textAlign: TextAlign.center, style: TextStyle(color: muted, fontSize: 12))),
         ])))));
@@ -239,7 +262,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
                     border: Border.all(color: const Color(0xFF38D8FF), width: 2)),
                   clipBehavior: Clip.antiAlias, child: Stack(children: [
                     RepaintBoundary(child: CustomPaint(painter: BoardPainter(game.visibleBoard), size: Size.infinite)),
-                    if (effectsEnabled && game.started) Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: SparkPainter(burst))))),
+                    if (burstVisible && effectsEnabled && game.canMove) Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: SparkPainter(burst))))),
                     if (!game.started || game.paused || game.over)
                       Container(color: const Color(0xE9091030), alignment: Alignment.center,
                         child: Column(mainAxisSize: MainAxisSize.min, children: [

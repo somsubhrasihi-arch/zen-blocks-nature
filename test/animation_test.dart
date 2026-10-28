@@ -28,6 +28,8 @@ void clearLine(ZenGame game) {
   game.hardDrop();
 }
 
+final sparkLayer = find.byWidgetPredicate((w) => w is CustomPaint && w.painter is SparkPainter);
+
 SparkPainter sparksOf(WidgetTester tester) => tester.widgetList<CustomPaint>(
   find.byType(CustomPaint)).map((w) => w.painter).whereType<SparkPainter>().single;
 
@@ -35,23 +37,16 @@ void main() {
   testWidgets('line clear bursts finish once and reset on a new game', (tester) async {
     await mountGame(tester);
     final game = gameOf(tester);
-    expect(sparksOf(tester).animation.value, 0);
+    expect(sparkLayer, findsNothing);
     clearLine(game);
     expect(game.lines, 1);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
     expect(sparksOf(tester).animation.value, inExclusiveRange(0, 1));
-    game.togglePause();
-    await tester.pump();
-    final paused = sparksOf(tester).animation.value;
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(sparksOf(tester).animation.value, paused);
-    game.togglePause();
-    await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
-    expect(sparksOf(tester).animation.status, AnimationStatus.completed);
+    expect(sparkLayer, findsNothing);
     await tester.pump(const Duration(seconds: 3));
-    expect(sparksOf(tester).animation.value, 1);
+    expect(sparkLayer, findsNothing);
     clearLine(game);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
@@ -59,7 +54,36 @@ void main() {
     game.reset();
     game.start();
     await tester.pump();
-    expect(sparksOf(tester).animation.value, 0);
+    expect(sparkLayer, findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('pause removes a burst and resume does not replay it', (tester) async {
+    await mountGame(tester);
+    final game = gameOf(tester);
+    clearLine(game);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(sparkLayer, findsOneWidget);
+    game.togglePause();
+    await tester.pump();
+    expect(sparkLayer, findsNothing);
+    game.togglePause();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 800));
+    expect(sparkLayer, findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('expiry removes particles even when the animation ticker stops', (tester) async {
+    await mountGame(tester);
+    clearLine(gameOf(tester));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    final dynamic state = tester.state(find.byType(GameScreen));
+    state.burst.stop();
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(sparkLayer, findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
