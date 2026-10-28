@@ -82,6 +82,9 @@ void main() {
     await sync();
     expect(backend.musicStates.last, false);
     expect(backend.cues.last, SoundCue.gameOver);
+    final stopsBeforeBackground = backend.stops;
+    await sync(foreground: false);
+    expect(backend.stops, greaterThan(stopsBeforeBackground));
     await audio.dispose();
     expect(backend.disposed, true);
     game.dispose();

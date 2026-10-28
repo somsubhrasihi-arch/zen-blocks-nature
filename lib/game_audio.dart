@@ -90,7 +90,7 @@ class GameAudio {
   final GameSoundTracker _tracker = GameSoundTracker();
   Future<void> _queue = Future.value();
   Future<void>? _initialization;
-  bool _disposed = false, _playing = false, _effects = false, _active = false;
+  bool _disposed = false, _playing = false, _effects = false, _audible = false;
 
   Future<void> _enqueue(Future<void> Function() action) {
     _queue = _queue.then((_) async {
@@ -114,12 +114,12 @@ class GameAudio {
     final playing = active && musicEnabled;
     final effects = active && effectsEnabled;
     final musicChanged = playing != _playing;
-    final silence = !effects && (_effects || _active);
+    final audible = foreground && effectsEnabled && !game.paused;
+    final silence = (!effects && _effects) || (!audible && _audible);
     _playing = playing;
     _effects = effects;
-    _active = active;
+    _audible = audible;
     // Game over may play its final cue while music is stopped.
-    final audible = foreground && effectsEnabled && !game.paused;
     final sounds = audible ? cues : <SoundCue>[];
     if (!musicChanged && !silence && sounds.isEmpty) return _queue;
     return _enqueue(() async {
