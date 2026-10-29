@@ -13,7 +13,7 @@ Future<void> mountGame(WidgetTester tester) async {
   addTearDown(() => tester.binding.setSurfaceSize(null));
   await tester.pumpWidget(ZenBlocksApp(audio: GameAudio(backend: FakeAudioBackend())));
   await tester.pump();
-  await tester.tap(find.text('Start playing'));
+  await tester.tap(find.text('Play Classic'));
   await tester.pump();
 }
 

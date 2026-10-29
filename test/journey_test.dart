@@ -156,6 +156,7 @@ void main() {
     await tester.tap(find.text('Journey · 0/30'));await tester.pump();await tester.pump(const Duration(milliseconds:350));
     expect(find.text('Play stage 1'),findsOneWidget);
     await capture(tester,'08-journey');
+    await tester.ensureVisible(find.text('Play stage 1'));
     await tester.tap(find.text('Play stage 1'));await tester.pump();await tester.pump(const Duration(milliseconds:700));await tester.pump();
     final dynamic state=tester.state(find.byType(GameScreen));
     expect(state.game.stage.id,1);
@@ -171,10 +172,10 @@ void main() {
     await tester.ensureVisible(find.text('Shop · 155'));await tester.tap(find.text('Shop · 155'));
     await tester.pump();await tester.pump(const Duration(milliseconds:350));
     await capture(tester,'10-shop');
+    await tester.ensureVisible(find.text('120 coins · Unlock'));
     await tester.tap(find.text('120 coins · Unlock'));await tester.pump();await tester.pump(const Duration(milliseconds:250));
-    await tester.tap(find.text('Unlock'));await tester.pump();await tester.pump();await tester.pump(const Duration(milliseconds:250));
+    await tester.tap(find.text('Unlock & equip')); await tester.pump();await tester.pump();await tester.pump(const Duration(milliseconds:250));
     expect(state.progress.data.coins,35);
-    await tester.tap(find.text('Equip'));await tester.pump();await tester.pump();
     expect(state.progress.data.skin,'pixel');
     await tester.tap(find.text('Achievements'));await tester.pump();
     await capture(tester,'11-achievements');

@@ -82,7 +82,7 @@ void main() {
     SharedPreferences.setMockInitialValues({'joystickEnabled': false});
     await tester.pumpWidget(ZenBlocksApp(audio: GameAudio(backend: FakeAudioBackend())));
     await tester.pump();
-    await tester.tap(find.text('Start playing'));
+    await tester.tap(find.text('Play Classic'));
     await tester.pump();
     expect(find.byType(GameJoystick), findsNothing);
     expect(find.text('LEFT'), findsOneWidget);
@@ -95,7 +95,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(ZenBlocksApp(audio: GameAudio(backend: FakeAudioBackend())));
     await tester.pump();
-    await tester.tap(find.text('Start playing'));
+    await tester.tap(find.text('Play Classic'));
     await tester.pump();
     final dynamic state = tester.state(find.byType(GameScreen));
     final initialX = state.game.active.x as int;

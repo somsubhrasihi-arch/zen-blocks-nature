@@ -21,6 +21,11 @@ class PlayerProgress {
   final Set<String> earned = {};
   final List<String> settledRuns = [];
   String skin = 'glass', effect = 'sparks';
+  JourneyStage? get recommendedStage {
+    for (final stage in journeyStages) { if (unlocked(stage) && !stars.containsKey(stage.id)) return stage; }
+    for (final stage in journeyStages) { if (unlocked(stage) && (stars[stage.id] ?? 0) < 3) return stage; }
+    return null;
+  }
   int get totalStars => stars.values.fold(0, (a, b) => a + b);
   bool unlocked(JourneyStage stage) => (stage.id == 1 || (stars[stage.id - 1] ?? 0) > 0) && totalStars >= stage.requiredStars;
   int achievementValue(String id) => switch (id) {
@@ -185,13 +190,17 @@ class ProgressStore extends ChangeNotifier {
       if (p.settledRuns.length > 256) p.settledRuns.removeAt(0);
       return RunReward(coins, earnedStars, unlocked, details: details, note: note);
     });
-  Future<PurchaseResult> buy(String id) => _transaction((p) {
+  Future<PurchaseResult> buy(String id, {bool equip = false}) => _transaction((p) {
     final item = itemForId(id);
     if (item == null) return PurchaseResult.unavailable;
     if (p.owned.contains(id)) return PurchaseResult.owned;
     if (p.coins < item.price) return PurchaseResult.insufficient;
     p.coins -= item.price;
     p.owned.add(id);
+    if (equip) {
+      if (item.kind == CosmeticKind.skin) { p.skin = id.split(':').last; }
+      else { p.effect = id.split(':').last; }
+    }
     return PurchaseResult.purchased;
   });
   Future<bool> equip(String id) => _transaction((p) {

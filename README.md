@@ -2,7 +2,11 @@
 
 T-BLOCK is an offline falling-block puzzle game for Android.
 
-## v1.6.0: Sprint, Daily Challenge and rewards
+## v1.7.0: Player-experience improvements
+
+See [UX_REVIEW.md](UX_REVIEW.md) for findings and implemented changes. This release adds working board gestures, pause-on-settings, clearer mode descriptions and wallet visibility, Journey shortcuts and world browsing, free cosmetic previews and shop filters, atomic unlock-and-equip, quieter result summaries and reduced-motion support.
+
+## Modes and rewards
 
 - Classic keeps the original endless game and personal best.
 - Journey adds 30 stages in three worlds: First Light, Prism Peaks and Cosmic Heights.

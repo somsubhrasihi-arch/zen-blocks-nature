@@ -16,6 +16,9 @@ import 'journey_ui.dart';
 import 'cosmetic_paint.dart';
 import 'play_modes.dart';
 import 'run_clock.dart';
+import 'board_touch.dart';
+import 'clear_effect.dart';
+export 'clear_effect.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -62,6 +65,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   bool _foreground = true;
   bool effectsEnabled = true;
   bool joystickEnabled = true;
+  bool reduceMotion = false, _systemReduceMotion = false;
+  bool _rewardDetailsExpanded = false;
+  bool get _motionAllowed => !reduceMotion && !_systemReduceMotion;
   final ZenGame game = ZenGame();
   late final GameAudio audio;
   bool musicEnabled = true;
@@ -84,7 +90,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   void _progressChanged() { if (mounted) setState(() {}); }
   void _openHub([int tab = 0]) {
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => Theme(data: _themeData,
-      child: AdventureHub(palette: _palette, progress: progress, initialTab: tab,
+      child: AdventureHub(palette: _palette, progress: progress, initialTab: tab, reduceMotion: !_motionAllowed,
         onStage: (stage) => _startNewGame(journeyStage: stage)))));
   }
   Future<void> _settleFinished() async {
@@ -130,6 +136,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     _scheduleTick();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _systemReduceMotion = MediaQuery.disableAnimationsOf(context);
+    WidgetsBinding.instance.addPostFrameCallback((_) { if (mounted) _syncAnimations(); });
+  }
+
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     final saved = await sessions.load();
@@ -143,6 +156,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       _musicTrack = trackForId(prefs.getString('musicTrack')).id;
       vibrationEnabled = prefs.getBool('vibrationEnabled') ?? true;
       effectsEnabled = prefs.getBool('effectsEnabled') ?? true;
+      reduceMotion = prefs.getBool('reduceMotion') ?? false;
       joystickEnabled = prefs.getBool('joystickEnabled') ?? true;
       musicVolume = (prefs.getDouble('musicVolume') ?? .28).clamp(0.0, 1.0).toDouble();
       effectsVolume = (prefs.getDouble('effectsVolume') ?? .8).clamp(0.0, 1.0).toDouble();
@@ -162,6 +176,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     await prefs.setString('musicTrack', _musicTrack);
     await prefs.setBool('vibrationEnabled', vibrationEnabled);
     await prefs.setBool('effectsEnabled', effectsEnabled);
+    await prefs.setBool('reduceMotion', reduceMotion);
     await prefs.setBool('joystickEnabled', joystickEnabled);
     await prefs.setDouble('musicVolume', musicVolume);
     await prefs.setDouble('effectsVolume', effectsVolume);
@@ -170,7 +185,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
 
   void _onGameChanged() {
     if (game.lines > lastLines) {
-      if (effectsEnabled && _foreground && !game.paused) {
+      if (effectsEnabled && _motionAllowed && _foreground && !game.paused) {
         burstVisible = true;
         burst.forward(from: 0);
         burstExpiry?.cancel();
@@ -253,6 +268,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     }
     _saveDebounce?.cancel();
     game.reset();
+    _rewardDetailsExpanded = false;
     _runReward = null; _settlingRun = null; _rewardError = null;
     setState(() { _home = false; _savedState = null; });
     game.start(journeyStage: journeyStage, playMode: playMode, dailyDay: dailyDay);
@@ -284,9 +300,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   }
 
   Widget _button(String label, IconData icon, VoidCallback? action, {bool primary = false,
-    Color? accent, double height = 58, bool stacked = false}) => ArcadeButton(
+    Color? accent, double height = 58, bool stacked = false, String? subtitle}) => ArcadeButton(
       label: label, icon: icon, onPressed: action, accent: accent ?? _palette.accent,
-      surface: _palette.control, primary: primary, height: height, stacked: stacked);
+      surface: _palette.control, primary: primary, height: height, stacked: stacked, subtitle: subtitle);
 
   Widget _volumeSlider(String label, double value, bool enabled, ValueChanged<double> onChanged) => Column(
     crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -311,8 +327,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
           _helpRow(Icons.route_rounded, 'Take the Journey', 'Complete stage objectives. Use fewer blocks to earn up to three stars and unlock new worlds.'),
           _helpRow(Icons.shopping_bag_rounded, 'Make it yours', 'Finish runs for Block Coins. Spend them on skins and clear effects in the Shop. Rewards save on this device.'),
           _helpRow(Icons.control_camera_rounded, 'Make your move', 'Hold the joystick left or right. Pull down to fall faster; push up to rotate.'),
-          _helpRow(Icons.rotate_right_rounded, 'Find the fit', 'Tap the board or Rotate. The faint outline shows where your piece will land.'),
-          _helpRow(Icons.keyboard_double_arrow_down_rounded, 'Drop it', 'Hit Drop to land your piece instantly.'),
+          _helpRow(Icons.rotate_right_rounded, 'Find the fit', 'Tap the board or Rotate. Drag across the board to move. The faint outline shows your landing spot.'),
+          _helpRow(Icons.keyboard_double_arrow_down_rounded, 'Drop it', 'Hit Drop or make a deliberate downward swipe on the board to land instantly.'),
           SizedBox(height: 8),
           SizedBox(width: double.infinity, child: _button('Got it', Icons.check_rounded, () => Navigator.pop(context), primary: true)),
         ]))),
@@ -327,25 +343,26 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       ])),
     ]));
 
+  Widget _homeMetric(String label, String value, IconData icon) => Expanded(child: FittedBox(fit: BoxFit.scaleDown,
+    child: Row(children: [Icon(icon, color: _palette.blocks[1], size: 24), SizedBox(width: 8),
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label, style: TextStyle(color: _palette.muted, fontSize: 9, letterSpacing: 1.2)),
+        Text(value, style: TextStyle(color: cream, fontSize: 22, fontWeight: FontWeight.w800)),
+      ])])));
+
   Widget _buildHome() => Center(child: SingleChildScrollView(child: Padding(
     padding: EdgeInsets.all(24), child: ConstrainedBox(constraints: BoxConstraints(maxWidth: 420),
     child: Column(mainAxisSize: MainAxisSize.min, children: [
-      TBlockMark(size: 60, color: _palette.accent), SizedBox(height: 16),
-      Text('T-BLOCK', textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 40, letterSpacing: 4, fontWeight: FontWeight.w900)),
+      Row(mainAxisAlignment: MainAxisAlignment.center, children: [TBlockMark(size: 44, color: _palette.accent), SizedBox(width: 12),
+        Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: Text('T-BLOCK', textAlign: TextAlign.center, style: TextStyle(fontSize: 32, letterSpacing: 3, fontWeight: FontWeight.w900))))]),
       SizedBox(height: 6),
       Text(gameTagline, style: TextStyle(color: _palette.muted, fontSize: 13, letterSpacing: 1.8)),
       SizedBox(height: 18),
-      Container(padding: EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+      Container(padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(color: _palette.panel.withValues(alpha: .7), borderRadius: BorderRadius.circular(20),
           border: Border.all(color: _palette.accent.withValues(alpha: .22))),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.emoji_events_rounded, color: _palette.blocks[1], size: 32), SizedBox(width: 14),
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('PERSONAL BEST', style: TextStyle(color: _palette.muted, fontSize: 9, letterSpacing: 1.6)),
-            Text('$highScore', style: TextStyle(color: cream, fontSize: 27, fontWeight: FontWeight.w800)),
-          ]),
-        ])),
+        child: Row(children: [_homeMetric('CLASSIC BEST', '$highScore', Icons.emoji_events_rounded), SizedBox(width: 18),
+          _homeMetric('BLOCK COINS', '${progress.data.coins}', Icons.monetization_on_rounded)])),
       SizedBox(height: 24),
       if (_loading) Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator()),
       if (_savedState != null) ...[
@@ -354,16 +371,16 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
         SizedBox(width: double.infinity, child: _button('Continue', Icons.play_arrow_rounded, _loading ? null : _continueGame, primary: true, height: 62)),
         SizedBox(height: 10),
       ],
-      SizedBox(width: double.infinity, child: _button(_savedState == null ? 'Start playing' : 'Start new game',
+      SizedBox(width: double.infinity, child: _button(_savedState == null ? 'Play Classic' : 'Start new game',
         Icons.bolt_rounded, _loading ? null : _startNewGame, primary: _savedState == null,
-        accent: _savedState == null ? _palette.accent : _palette.blocks[2], height: 62)),
+        accent: _savedState == null ? _palette.accent : _palette.blocks[2], height: 62, subtitle: 'Endless play · Set your own best')),
       SizedBox(height: 12),
       SizedBox(width: double.infinity, child: _button('Journey · ${progress.data.stars.length}/30', Icons.route_rounded,
-        _loading ? null : () => _openHub(), accent: _palette.blocks[2], height: 58)),
+        _loading ? null : () => _openHub(), accent: _palette.blocks[2], height: 62, subtitle: '30 stages · Clear goals and collect stars')),
       SizedBox(height: 10),
-      Row(children: [Expanded(child: _button('Sprint', Icons.timer_rounded, _loading ? null : () => _showModeIntro(PlayMode.sprint), height: 54)),
+      Row(children: [Expanded(child: _button('Sprint', Icons.timer_rounded, _loading ? null : () => _showModeIntro(PlayMode.sprint), height: 62, subtitle: '40 lines · Beat the clock')),
         SizedBox(width: 10), Expanded(child: _button('Daily Challenge', Icons.today_rounded,
-          _loading ? null : () => _showModeIntro(PlayMode.daily), accent: _palette.blocks[3], height: 54))]),
+          _loading ? null : () => _showModeIntro(PlayMode.daily), accent: _palette.blocks[3], height: 62, subtitle: progress.data.canClaimDaily(utcDay(DateTime.now())) ? 'Today’s reward is ready' : 'Reward collected · Practice'))]),
       SizedBox(height: 10),
       Row(children: [Expanded(child: _button('Shop · ${progress.data.coins}', Icons.shopping_bag_rounded,
           _loading ? null : () => _openHub(1), accent: _palette.blocks[1], height: 50)),
@@ -373,7 +390,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
         Expanded(child: _button('How to play', Icons.sports_esports_rounded, _showHowToPlay, height: 50)),
         SizedBox(width: 10), Expanded(child: Tooltip(message: 'Settings', child: _button('Settings', Icons.tune_rounded, _showSettings, height: 50))),
       ]),
-      SizedBox(height: 22), Text('v1.6.0', style: TextStyle(color: _palette.muted.withValues(alpha: .65), fontSize: 10, letterSpacing: 1)),
+      SizedBox(height: 22), Text('v1.7.0', style: TextStyle(color: _palette.muted.withValues(alpha: .65), fontSize: 10, letterSpacing: 1)),
     ])),
   )));
 
@@ -417,7 +434,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   }
 
   void _syncAnimations() {
-    final animate = effectsEnabled && _foreground && !game.paused;
+    final animate = effectsEnabled && _motionAllowed && _foreground && !game.paused;
     if (animate) {
       if (!aurora.isAnimating) aurora.repeat();
       if (burstVisible && burst.value > 0 && burst.value < 1 && !burst.isAnimating) {
@@ -464,13 +481,15 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     super.dispose();
   }
 
-  Widget _stat(String label, String value) => Expanded(child: Container(
+  Widget _stat(String label, String value, {double? progressValue}) => Expanded(child: Container(
     padding: EdgeInsets.symmetric(vertical: 5, horizontal: 8),
     decoration: BoxDecoration(gradient: LinearGradient(colors: _palette.stats), borderRadius: BorderRadius.circular(14),
       border: Border.all(color: _palette.accent.withValues(alpha: .26))),
     child: Center(child: FittedBox(fit: BoxFit.scaleDown, child: Column(mainAxisSize: MainAxisSize.min, children: [
       Text(label.toUpperCase(), style: TextStyle(color: _palette.muted, fontSize: 8, letterSpacing: 1.5)),
       SizedBox(height: 2), Text(value, style: TextStyle(color: cream, fontSize: 19, fontWeight: FontWeight.w800)),
+      if (progressValue != null) ...[SizedBox(height: 3), SizedBox(width: 60, child: LinearProgressIndicator(
+        value: progressValue.clamp(0, 1).toDouble(), minHeight: 3, color: _palette.accent, backgroundColor: _palette.grid))],
     ]))),
   ));
 
@@ -503,7 +522,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     title: Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
     value: value, onChanged: change, activeColor: _palette.accent));
 
-  void _showSettings() => showModalBottomSheet<void>(context: context,
+  void _showSettings() {
+    if (game.canMove) game.togglePause();
+    showModalBottomSheet<void>(context: context,
     useSafeArea: true, isScrollControlled: true, backgroundColor: Colors.transparent,
     builder: (context) => StatefulBuilder(builder: (context, update) => Theme(data: _themeData,
       child: DraggableScrollableSheet(expand: false, initialChildSize: .9, minChildSize: .55, maxChildSize: .96,
@@ -534,6 +555,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
                   ]))).toList(),
                   onChanged: (id) { if (id == null) return; update(() => _palette = paletteForId(id)); setState(() {}); _saveSettings(); }),
                 SizedBox(height: 6),
+                _settingToggle('Reduce motion', Icons.motion_photos_off_rounded, reduceMotion, (v) {
+                  update(() => reduceMotion = v); setState(() {}); _syncAnimations(); _saveSettings();
+                }),
                 _settingToggle('Line-clear effects', Icons.auto_awesome_rounded, effectsEnabled, (v) => update(() => _setEffectsEnabled(v))),
               ]),
               _settingsSection('Audio', Icons.graphic_eq_rounded, [
@@ -570,21 +594,29 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
                   update(() => vibrationEnabled = v); setState(() {}); _saveSettings();
                 }),
               ]),
-              Center(child: Text('T-BLOCK • 1.6.0', style: TextStyle(color: _palette.muted.withValues(alpha: .65), fontSize: 10, letterSpacing: 1))),
+              Center(child: Text('T-BLOCK • 1.7.0', style: TextStyle(color: _palette.muted.withValues(alpha: .65), fontSize: 10, letterSpacing: 1))),
             ])),
           ]),
         )),
     )));
 
+  }
+
   Widget _boardContents() => Stack(children: [
-    RepaintBoundary(child: CustomPaint(painter: BoardPainter(game.visibleBoard, ghost: game.ghostPiece, palette: _palette, skin: progress.data.skin, markedRows: game.obstacleRows), size: Size.infinite)),
-    if (burstVisible && effectsEnabled && game.canMove) Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: SparkPainter(burst, palette: _palette, effect: progress.data.effect))))),
+    BoardTouchControls(key: ValueKey('board-touch'), enabled: game.canMove, onRotate: () => _act(_rotate),
+      onMove: (dx) => game.move(dx, 0), onDrop: () => _act(game.hardDrop),
+      child: RepaintBoundary(child: CustomPaint(painter: BoardPainter(game.visibleBoard, ghost: game.ghostPiece, palette: _palette, skin: progress.data.skin, markedRows: game.obstacleRows), size: Size.infinite))),
+    if (burstVisible && effectsEnabled && _motionAllowed && game.canMove) Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: SparkPainter(burst, palette: _palette, effect: progress.data.effect))))),
     if (game.paused || game.over || game.completed) Positioned.fill(child: ColoredBox(color: _palette.overlay,
       child: Center(child: SingleChildScrollView(child: Padding(padding: EdgeInsets.all(16), child: Column(mainAxisSize: MainAxisSize.min, children: [
         Icon(game.completed || game.over ? Icons.emoji_events_rounded : Icons.pause_circle_rounded, color: _palette.blocks[1], size: 34),
         SizedBox(height: 8),
         Text(game.completed ? (game.mode == PlayMode.sprint ? 'Sprint complete!' : game.mode == PlayMode.daily ? 'Challenge complete!' : 'Stage complete!') : game.over ? (game.mode == PlayMode.classic ? 'Nice run!' : 'Try again!') : 'Paused',
           textAlign: TextAlign.center, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+        if (game.mode != PlayMode.classic) ...[SizedBox(height: 6), Text(game.modeLabel, textAlign: TextAlign.center,
+          style: TextStyle(color: _palette.muted, fontSize: 12))],
+        if (game.over && game.goalTarget > 0) Text('${game.goalProgress}/${game.goalTarget} · ${game.objective}',
+          textAlign: TextAlign.center, style: TextStyle(color: _palette.muted, fontSize: 12)),
         if (game.completed && game.stage != null) ...[
           SizedBox(height: 6), Row(mainAxisAlignment: MainAxisAlignment.center, children: [
             for (var i = 0; i < 3; i++) Icon(i < game.earnedStars ? Icons.star_rounded : Icons.star_outline_rounded, color: _palette.blocks[1], size: 30),
@@ -598,7 +630,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
           if (_settling) Text('Saving rewards…', style: TextStyle(color: _palette.muted, fontSize: 12)),
           if (_runReward != null) ...[
             Text('+${_runReward!.coins} Block Coins', textAlign: TextAlign.center, style: TextStyle(color: _palette.blocks[1], fontWeight: FontWeight.w800)),
-            for (final entry in _runReward!.details.entries) Text('${entry.key}: +${entry.value}', textAlign: TextAlign.center, style: TextStyle(color: _palette.muted, fontSize: 10)),
+            Text('Wallet · ${progress.data.coins} coins', style: TextStyle(color: _palette.muted, fontSize: 12)),
+            TextButton(onPressed: () => setState(() => _rewardDetailsExpanded = !_rewardDetailsExpanded),
+              child: Text(_rewardDetailsExpanded ? 'Hide reward details' : 'Reward details', style: TextStyle(color: _palette.accent))),
+            if (_rewardDetailsExpanded) for (final entry in _runReward!.details.entries)
+              Text('${entry.key}: +${entry.value}', textAlign: TextAlign.center, style: TextStyle(color: _palette.muted, fontSize: 11)),
             if (_runReward!.note != null) Text(_runReward!.note!, textAlign: TextAlign.center, style: TextStyle(color: _palette.accent, fontSize: 11)),
             for (final name in _runReward!.achievements) Text('Unlocked: $name', textAlign: TextAlign.center, style: TextStyle(color: _palette.accent, fontSize: 11)),
           ],
@@ -619,6 +655,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
           () => _startNewGame(journeyStage: game.stage, playMode: game.mode, dailyDay: game.daily?.day), height: 48)],
         if (game.stage != null && !game.paused) ...[SizedBox(height: 8), _button('Journey map', Icons.route_rounded,
           _settling || _rewardError != null ? null : () { _returnHome(); _openHub(); }, height: 48)],
+        if (!game.paused) ...[SizedBox(height: 8), _button('Visit shop', Icons.shopping_bag_rounded,
+          _settling || _rewardError != null ? null : () { _returnHome(); _openHub(1); }, height: 48)],
         SizedBox(height: 8), _button('Home', Icons.home_rounded, _settling || _rewardError != null ? null : _returnHome, height: 48),
       ])))),
     )),
@@ -642,7 +680,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       SizedBox(height: 6),
       SizedBox(height: 52 * scale, child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         if (game.mode == PlayMode.sprint) ...[
-          _stat('Lines', '${game.lines}/40'), SizedBox(width: 6),
+          _stat('Lines', '${game.lines}/40', progressValue: game.lines/40), SizedBox(width: 6),
           Expanded(child: Container(padding: EdgeInsets.symmetric(horizontal: 4),
             decoration: BoxDecoration(color: _palette.panel, borderRadius: BorderRadius.circular(14), border: Border.all(color: _palette.accent.withValues(alpha: .26))),
             child: Center(child: FittedBox(fit: BoxFit.scaleDown, child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -651,7 +689,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
           _stat('Best', progress.data.sprintBestMs == 0 ? '—' : formatRunTime(progress.data.sprintBestMs)),
         ] else ...[
           _stat('Score', '${game.score}'), SizedBox(width: 6), _stat('Level', '${game.level}'), SizedBox(width: 6),
-          _stat(game.mode == PlayMode.classic ? 'Best' : 'Goal', game.mode == PlayMode.classic ? '$highScore' : '${game.goalProgress}/${game.goalTarget}'),
+          _stat(game.mode == PlayMode.classic ? 'Best' : 'Goal', game.mode == PlayMode.classic ? '$highScore' : '${game.goalProgress}/${game.goalTarget}',
+            progressValue: game.goalTarget > 0 ? game.goalProgress/game.goalTarget : null),
         ], SizedBox(width: 6),
         Container(width: 52, padding: EdgeInsets.all(4), decoration: BoxDecoration(color: _palette.panel,
           borderRadius: BorderRadius.circular(14), border: Border.all(color: _palette.accent.withValues(alpha: .26))),
@@ -691,7 +730,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     child: Scaffold(body: Container(
       decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: _palette.background)),
       child: Stack(children: [
-        Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: AuroraPainter(aurora, game.level, effectsEnabled, palette: _palette))))),
+        Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: AuroraPainter(aurora, game.level, effectsEnabled && _motionAllowed, palette: _palette))))),
         SafeArea(child: _home ? _buildHome() : _buildGame()),
       ]),
     )),
@@ -787,42 +826,6 @@ class AuroraPainter extends CustomPainter {
   }
   @override
   bool shouldRepaint(covariant AuroraPainter old) => old.animation != animation || old.level != level || old.enabled != enabled || old.palette != palette;
-}
-
-class SparkPainter extends CustomPainter {
-  SparkPainter(this.animation, {this.palette = neonPalette, this.effect = 'sparks'}) : super(repaint: animation);
-  final GamePalette palette;
-  final Animation<double> animation;
-  final String effect;
-  @override
-  void paint(Canvas canvas, Size size) {
-    final progress = animation.value;
-    if (progress <= 0 || progress >= 1) return;
-    if (effect == 'nova') {
-      for (var i = 0; i < 3; i++) {
-        canvas.drawCircle(Offset(size.width / 2, size.height * .65), (progress * size.width * .5 + i * 10),
-          Paint()..color = palette.blocks[i].withValues(alpha: (1-progress) * .8)..style = PaintingStyle.stroke..strokeWidth = 3*(1-progress)+1);
-      }
-    }
-    if (effect == 'lightning') {
-      for (var i = 0; i < 5; i++) {
-        final x = size.width * (i + 1) / 6;
-        final y = size.height * .65;
-        final path = Path()..moveTo(x + 12, y - progress * 75)..lineTo(x - 7, y)..lineTo(x + 7, y)..lineTo(x - 12, y + progress * 75);
-        canvas.drawPath(path, Paint()..color = palette.blocks[i].withValues(alpha: 1-progress)..style = PaintingStyle.stroke..strokeWidth = 3..strokeCap = StrokeCap.round);
-      }
-      return;
-    }
-    for (var i = 0; i < 24; i++) {
-      final a = i * math.pi * 2 / 24;
-      final distance = 15 + progress * size.width * .48;
-      final center = Offset(size.width / 2, size.height * .65);
-      final point = center + Offset(math.cos(a) * distance, math.sin(a) * distance * .5);
-      canvas.drawCircle(point, 1.5 + (1 - progress) * 2.5, Paint()..color = palette.blocks[i % palette.blocks.length].withValues(alpha: 1 - progress));
-    }
-  }
-  @override
-  bool shouldRepaint(covariant SparkPainter old) => old.animation != animation || old.palette != palette || old.effect != effect;
 }
 
 class NextPainter extends CustomPainter {

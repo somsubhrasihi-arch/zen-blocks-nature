@@ -4,13 +4,15 @@ import 'campaign.dart';
 import 'cosmetic_paint.dart';
 import 'customization.dart';
 import 'progress_store.dart';
+import 'cosmetic_preview.dart';
 
 class AdventureHub extends StatefulWidget {
-  const AdventureHub({super.key, required this.palette, required this.progress, required this.onStage, this.initialTab = 0});
+  const AdventureHub({super.key, required this.palette, required this.progress, required this.onStage, this.initialTab = 0, this.reduceMotion = false});
   final GamePalette palette;
   final ProgressStore progress;
   final ValueChanged<JourneyStage> onStage;
   final int initialTab;
+  final bool reduceMotion;
   @override
   State<AdventureHub> createState() => _AdventureHubState();
 }
@@ -18,6 +20,8 @@ class AdventureHub extends StatefulWidget {
 class _AdventureHubState extends State<AdventureHub> {
   late int tab = widget.initialTab;
   bool busy = false;
+  late int selectedWorld = widget.progress.data.recommendedStage?.world ?? 0;
+  String shopFilter = 'All';
   GamePalette get p => widget.palette;
   PlayerProgress get data => widget.progress.data;
   Widget button(String text, IconData icon, VoidCallback? action) => ArcadeButton(label: text, icon: icon,
@@ -28,18 +32,32 @@ class _AdventureHubState extends State<AdventureHub> {
   void message(String text) {
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
+  void preview(ShopItem item) => showModalBottomSheet<void>(context: context, useSafeArea: true,
+    isScrollControlled: true, backgroundColor: p.panel, showDragHandle: true,
+    builder: (context) => SafeArea(child: SingleChildScrollView(child: Padding(padding: const EdgeInsets.all(20),
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(item.name, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800)), const SizedBox(height: 12),
+        CosmeticLivePreview(item: item, palette: p, skin: data.skin, reduceMotion: widget.reduceMotion),
+        const SizedBox(height: 12), Text(item.description, style: TextStyle(color: p.muted, height: 1.5)),
+        const SizedBox(height: 16), SizedBox(width: double.infinity, child: button('Close preview', Icons.check_rounded, () => Navigator.pop(context))),
+      ])))));
+
   Future<void> buy(ShopItem item) async {
     if (busy) return;
     setState(() => busy = true);
     final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
-      title: Text('Unlock ${item.name}?'), content: Text('${item.price} Block Coins\nBalance after purchase: ${data.coins - item.price}'),
+      title: Text('Unlock ${item.name}?'), scrollable: true,
+      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        CosmeticLivePreview(item: item, palette: p, skin: data.skin, reduceMotion: widget.reduceMotion),
+        const SizedBox(height: 12), Text('${item.price} Block Coins\nBalance after purchase: ${data.coins-item.price}'),
+      ]),
       actions: [Row(children: [Expanded(child: button('Cancel', Icons.close_rounded, () => Navigator.pop(context, false))),
-        const SizedBox(width: 10), Expanded(child: button('Unlock', Icons.check_rounded, () => Navigator.pop(context, true)))])]));
+        const SizedBox(width: 10), Expanded(child: button('Unlock & equip', Icons.check_rounded, () => Navigator.pop(context, true)))])]));
     if (confirmed != true || !mounted) { if (mounted) setState(() => busy = false); return; }
     try {
-      final result = await widget.progress.buy(item.id);
-      message(switch (result) { PurchaseResult.purchased => '${item.name} unlocked!',
-        PurchaseResult.owned => 'Already in your collection', PurchaseResult.insufficient => 'Earn more coins in Classic or Journey',
+      final result = await widget.progress.buy(item.id, equip: true);
+      message(switch (result) { PurchaseResult.purchased => '${item.name} equipped',
+        PurchaseResult.owned => 'Already in your collection', PurchaseResult.insufficient => 'Earn more coins by finishing games and challenges',
         PurchaseResult.unavailable => 'This item is unavailable' });
     } catch (_) { message('Could not save your purchase. Please try again.'); }
     finally { if (mounted) setState(() => busy = false); }
@@ -66,7 +84,7 @@ class _AdventureHubState extends State<AdventureHub> {
         NavigationDestination(icon: Icon(Icons.shopping_bag_rounded), label: 'Shop'),
         NavigationDestination(icon: Icon(Icons.emoji_events_rounded), label: 'Achievements'),
       ]),
-    body: SafeArea(child: ListView(padding: const EdgeInsets.all(16), children: tab == 0 ? journey() : tab == 1 ? shop() : trophies())),
+    body: SafeArea(child: ListView(key: ValueKey('hub-$tab-$selectedWorld'), padding: const EdgeInsets.all(16), children: tab == 0 ? journey() : tab == 1 ? shop() : trophies())),
   ));
 
   List<Widget> journey() => [
@@ -75,8 +93,18 @@ class _AdventureHubState extends State<AdventureHub> {
       const SizedBox(height: 8), Text('${data.stars.length}/30 stages complete  •  ${data.totalStars}/90 stars'),
       const SizedBox(height: 12), LinearProgressIndicator(value: data.totalStars/90, color: p.blocks[1], backgroundColor: p.control),
       const SizedBox(height: 12), Text('Complete objectives to earn coins. Use fewer blocks for more stars.', style: TextStyle(color: p.muted, height: 1.4)),
+      if (data.recommendedStage != null) ...[const SizedBox(height: 12),
+        Text('Up next: Stage ${data.recommendedStage!.id} · ${data.recommendedStage!.name}', style: TextStyle(color: p.accent, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 10), SizedBox(width: double.infinity, child: button('Continue Journey', Icons.play_arrow_rounded, () {
+          final stage = data.recommendedStage!; Navigator.pop(context); widget.onStage(stage);
+        })),
+      ],
     ])),
-    for (var world = 0; world < 3; world++) ...[
+    Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Wrap(spacing: 6, runSpacing: 6, children: [
+      for (var i=0; i<3; i++) ChoiceChip(label: Text(worldNames[i]), selected: selectedWorld == i,
+        selectedColor: p.accent.withValues(alpha: .25), onSelected: (_) => setState(() => selectedWorld=i)),
+    ])),
+    for (final world in [selectedWorld]) ...[
       Padding(padding: const EdgeInsets.fromLTRB(4, 16, 4, 12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('WORLD ${world + 1} · ${worldNames[world]}', style: TextStyle(color: p.accent, fontWeight: FontWeight.w800, letterSpacing: .8)),
         const SizedBox(height: 4), Text('${worldDescriptions[world]}${world == 0 ? '' : ' · ${[0,12,28][world]} stars to enter'}', style: TextStyle(color: p.muted, fontSize: 12)),
@@ -105,12 +133,20 @@ class _AdventureHubState extends State<AdventureHub> {
   List<Widget> shop() => [
     card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text('Make it yours', style: TextStyle(color: p.accent, fontSize: 22, fontWeight: FontWeight.w800)),
-      const SizedBox(height: 8), Text('Earn Block Coins in Classic, Journey, Sprint, Daily Challenge and achievements. Unlock a look, then equip it.', style: TextStyle(color: p.muted, height: 1.4)),
+      const SizedBox(height: 8), Text('Preview a look. Unlock it with Block Coins and wear it straight away.', style: TextStyle(color: p.muted, height: 1.4)),
+      const SizedBox(height: 12), Wrap(spacing: 6, runSpacing: 6, children: [
+        for (final filter in ['All','Owned','Affordable']) ChoiceChip(label: Text(filter), selected: shopFilter==filter,
+          selectedColor: p.accent.withValues(alpha: .25), onSelected: (_) => setState(() => shopFilter=filter)),
+      ]),
     ])),
     for (final kind in CosmeticKind.values) ...[
       Padding(padding: const EdgeInsets.fromLTRB(4, 12, 4, 12), child: Text(kind == CosmeticKind.skin ? 'BLOCK SKINS' : 'CLEAR EFFECTS', style: TextStyle(color: p.accent, fontWeight: FontWeight.w800, letterSpacing: 1))),
-      for (final item in shopItems.where((i) => i.kind == kind)) shopCard(item),
+      for (final item in shopItems.where((i) => i.kind == kind && visible(i))) shopCard(item),
     ],
+    if (!shopItems.any(visible)) card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('A little more play, a new look', style: TextStyle(color: p.accent, fontSize: 18, fontWeight: FontWeight.w800)),
+      const SizedBox(height: 8), Text('No new items fit this filter yet. Finish a game or Daily Challenge to earn coins, or browse All to preview your next unlock.', style: TextStyle(color:p.muted,height:1.5)),
+    ])),
     card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text('REWARD GUIDE', style: TextStyle(color: p.accent, fontWeight: FontWeight.w800, letterSpacing: 1)),
       const SizedBox(height: 8), Text('Classic: 5 coins per cleared line. Journey: first clears and better stars. Sprint: completion, speed and personal bests. Daily Challenge: 120–180 coins once per UTC day.', style: TextStyle(color: p.muted, fontSize: 12, height: 1.5)),
@@ -119,6 +155,11 @@ class _AdventureHubState extends State<AdventureHub> {
     Center(child: Text('Progress and coins are saved on this device.', style: TextStyle(color: p.muted, fontSize: 11))),
     const SizedBox(height: 12),
   ];
+  bool visible(ShopItem item) => switch (shopFilter) {
+    'Owned' => data.owned.contains(item.id),
+    'Affordable' => !data.owned.contains(item.id) && item.price <= data.coins,
+    _ => true,
+  };
   Widget shopCard(ShopItem item) {
     final owned = data.owned.contains(item.id);
     final equipped = item.id == 'skin:${data.skin}' || item.id == 'effect:${data.effect}';
@@ -130,9 +171,14 @@ class _AdventureHubState extends State<AdventureHub> {
           Text(item.description, style: TextStyle(color: p.muted, fontSize: 12, height: 1.4)),
         ])),
       ]), const SizedBox(height: 14),
-      SizedBox(width: double.infinity, child: button(equipped ? 'Equipped' : owned ? 'Equip' : '${item.price} coins · Unlock',
-        equipped ? Icons.check_circle_rounded : owned ? Icons.check_rounded : Icons.monetization_on_rounded,
-        busy || equipped ? null : owned ? () => equip(item) : data.coins >= item.price ? () => buy(item) : null)),
+      Row(children: [SizedBox(width: 100, child: button('Preview', Icons.visibility_rounded, () => preview(item))), const SizedBox(width: 10),
+        Expanded(child: equipped ? Container(height: 43, alignment: Alignment.center,
+          decoration: BoxDecoration(color:p.accent.withValues(alpha:.12),borderRadius:BorderRadius.circular(16),border:Border.all(color:p.accent.withValues(alpha:.4))),
+          child: Row(mainAxisAlignment:MainAxisAlignment.center,children:[Icon(Icons.check_circle_rounded,color:p.accent,size:18),const SizedBox(width:6),
+            Text('Equipped',style:TextStyle(color:p.accent,fontWeight:FontWeight.w700))]))
+          : button(owned ? 'Equip' : '${item.price} coins · Unlock', owned ? Icons.check_rounded : Icons.monetization_on_rounded,
+            busy ? null : owned ? () => equip(item) : data.coins >= item.price ? () => buy(item) : null)),
+      ]),
       if (!owned && data.coins < item.price) Center(child: Padding(padding: const EdgeInsets.only(top: 6),
         child: Text('${item.price-data.coins} more coins needed', style: TextStyle(color: p.muted, fontSize: 11)))),
     ]));

@@ -63,7 +63,7 @@ void main() {
   for (final size in [const Size(360, 640), const Size(393, 850), const Size(412, 900), const Size(480, 960)]) {
     testWidgets('board and controls fit ${size.width.toInt()}x${size.height.toInt()}', (tester) async {
       await mount(tester, size);
-      await tester.tap(find.text('Start playing')); await tester.pump();
+      await tester.tap(find.text('Play Classic')); await tester.pump();
       final frame = tester.getRect(find.byKey(const ValueKey('playing-field-frame')));
       final board = tester.getRect(find.byWidgetPredicate((w) => w is CustomPaint && w.painter is BoardPainter));
       expect(frame.left, greaterThanOrEqualTo(8));
@@ -84,7 +84,7 @@ void main() {
     tester.platformDispatcher.textScaleFactorTestValue = 1.5;
     addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
     await mount(tester, const Size(393, 850));
-    await tester.tap(find.text('Start playing')); await tester.pump();
+    await tester.tap(find.text('Play Classic')); await tester.pump();
     final frame = tester.getRect(find.byKey(const ValueKey('playing-field-frame')));
     expect(frame.top, greaterThan(0));
     expect(frame.bottom, lessThan(tester.getTopLeft(find.text('DROP')).dy));
@@ -100,7 +100,7 @@ void main() {
 
   testWidgets('board border paints continuously on all four sides', (tester) async {
     await mount(tester, const Size(412, 900));
-    await tester.tap(find.text('Start playing')); await tester.pump();
+    await tester.tap(find.text('Play Classic')); await tester.pump();
     await tester.runAsync(() async {
       final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(const ValueKey('board-frame-capture')));
       final image = await boundary.toImage();
@@ -135,7 +135,7 @@ void main() {
     expect(find.text(gameTagline), findsOneWidget);
     expect(find.text('NEON AURORA'), findsNothing);
     await capture(tester, '01-home');
-    await tester.tap(find.text('Start playing')); await tester.pump();
+    await tester.tap(find.text('Play Classic')); await tester.pump();
     final dynamic state = tester.state(find.byType(GameScreen));
     state.game.board[19] = [1, 1, 0, 4, 4, 5, 5, 0, 7, 7];
     state.game.board[18] = [0, 0, 0, 4, 0, 5, 0, 0, 7, 0];
@@ -154,7 +154,7 @@ void main() {
     await capture(tester, '04-theme-menu');
     Navigator.of(tester.element(find.byType(GameScreen))).pop();
     await tester.pump(); await tester.pump(const Duration(milliseconds: 350));
-    await tester.scrollUntilVisible(find.text('T-BLOCK • 1.6.0'), 250, scrollable: find.byType(Scrollable).last); await tester.pump();
+    await tester.scrollUntilVisible(find.text('T-BLOCK • 1.7.0'), 250, scrollable: find.byType(Scrollable).last); await tester.pump();
     await capture(tester, '05-settings-controls');
     expect(find.text('Settings'), findsWidgets);
     expect(tester.takeException(), isNull);

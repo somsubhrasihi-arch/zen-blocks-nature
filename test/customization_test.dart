@@ -63,7 +63,7 @@ void main() {
     await tester.pumpWidget(ZenBlocksApp(audio: GameAudio(backend: backend)));
     await tester.pump(); await tester.pump();
     expect(find.text(gameTagline), findsOneWidget);
-    await tester.tap(find.text('Start playing'));
+    await tester.tap(find.text('Play Classic'));
     await tester.pump(); await tester.pump();
     final board = tester.widgetList<CustomPaint>(find.byType(CustomPaint)).map((w) => w.painter).whereType<BoardPainter>().single;
     expect(board.palette.id, 'forest');
@@ -80,7 +80,7 @@ void main() {
     final backend = FakeAudioBackend();
     await tester.pumpWidget(ZenBlocksApp(audio: GameAudio(backend: backend)));
     await tester.pump(); await tester.pump();
-    await tester.tap(find.text('Start playing')); await tester.pump();
+    await tester.tap(find.text('Play Classic')); await tester.pump();
     await tester.tap(find.byTooltip('Pause')); await tester.pump();
     final dynamic state = tester.state(find.byType(GameScreen));
     final saved = state.game.saveState();

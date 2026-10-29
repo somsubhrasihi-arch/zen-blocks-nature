@@ -118,7 +118,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(ZenBlocksApp(audio: GameAudio(backend: FakeAudioBackend())));
     await tester.pump(); await tester.pump();
-    await tester.tap(find.text('Start playing')); await tester.pump();
+    await tester.tap(find.text('Play Classic')); await tester.pump();
     final dynamic state = tester.state(find.byType(GameScreen));
     for (var i = 0; i < 10; i++) {
       await tester.tap(find.text('ROTATE'));
