@@ -75,7 +75,7 @@ void main() {
   testWidgets('locked cosmetic previews do not spend coins and filters stay useful',(tester)async{
     final store=ProgressStore();await store.load();
     await tester.binding.setSurfaceSize(const Size(412,900));addTearDown(()=>tester.binding.setSurfaceSize(null));
-    await tester.pumpWidget(RepaintBoundary(key:captureKey,child:MaterialApp(home:AdventureHub(palette:neonPalette,progress:store,onStage:(_){},initialTab:1))));await tester.pump();
+    await tester.pumpWidget(RepaintBoundary(key:captureKey,child:MaterialApp(debugShowCheckedModeBanner:false, theme:ThemeData(useMaterial3:true,brightness:Brightness.dark,fontFamily:'Roboto',colorSchemeSeed:neonPalette.accent), home:AdventureHub(palette:neonPalette,progress:store,onStage:(_){},initialTab:1))));await tester.pump();
     final previews=find.text('Preview');await tester.ensureVisible(previews.at(2));await tester.tap(previews.at(2));
     await tester.pump();await tester.pump(const Duration(milliseconds:500));
     expect(find.text('Jelly Gems'),findsWidgets);expect(store.data.coins,0);expect(store.data.skin,'glass');
