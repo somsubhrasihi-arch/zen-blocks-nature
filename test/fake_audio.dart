@@ -6,6 +6,9 @@ class FakeAudioBackend implements AudioBackend {
   int stops = 0;
   bool disposed = false;
   final levels = <List<double>>[];
+  final tracks = <String>[];
+  @override
+  Future<void> track(String asset) async { tracks.add(asset); }
   @override
   Future<void> volumes(double music, double effects) async { levels.add([music, effects]); }
   @override

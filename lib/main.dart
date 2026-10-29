@@ -7,6 +7,8 @@ import 'game.dart';
 import 'joystick.dart';
 import 'game_audio.dart';
 import 'session_store.dart';
+import 'customization.dart';
+import 't_block_mark.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,7 +31,7 @@ class ZenBlocksApp extends StatelessWidget {
   final GameAudio? audio;
   @override
   Widget build(BuildContext context) => MaterialApp(
-        title: 'Zen Blocks',
+        title: appDisplayName,
         debugShowCheckedModeBanner: false,
         theme: ThemeData(useMaterial3: true, brightness: Brightness.dark,
           scaffoldBackgroundColor: forest, colorSchemeSeed: const Color(0xFF9ECFC0)),
@@ -56,6 +58,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   final ZenGame game = ZenGame();
   late final GameAudio audio;
   bool musicEnabled = true;
+  GamePalette _palette = neonPalette;
+  String _musicTrack = 'aurora';
+  ThemeData get _themeData => ThemeData(useMaterial3: true, brightness: Brightness.dark,
+    scaffoldBackgroundColor: _palette.background.first, colorSchemeSeed: _palette.accent);
   double musicVolume = .28, effectsVolume = .8;
   int joystickRepeat = 120;
   final SessionStore sessions = SessionStore();
@@ -74,8 +80,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     super.initState();
     audio = widget.audio ?? GameAudio();
     unawaited(audio.prepare());
-    aurora = AnimationController(vsync: this, duration: const Duration(seconds: 8))..repeat();
-    burst = AnimationController(vsync: this, duration: const Duration(milliseconds: 650))
+    aurora = AnimationController(vsync: this, duration: Duration(seconds: 8))..repeat();
+    burst = AnimationController(vsync: this, duration: Duration(milliseconds: 650))
       ..addStatusListener((status) {
         if (status == AnimationStatus.completed) _hideBurst();
       });
@@ -93,6 +99,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       highScore = prefs.getInt('highScore') ?? 0;
       soundEnabled = prefs.getBool('soundEnabled') ?? true;
       musicEnabled = prefs.getBool('musicEnabled') ?? true;
+      _palette = paletteForId(prefs.getString('themeId'));
+      _musicTrack = trackForId(prefs.getString('musicTrack')).id;
       vibrationEnabled = prefs.getBool('vibrationEnabled') ?? true;
       effectsEnabled = prefs.getBool('effectsEnabled') ?? true;
       joystickEnabled = prefs.getBool('joystickEnabled') ?? true;
@@ -110,6 +118,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('soundEnabled', soundEnabled);
     await prefs.setBool('musicEnabled', musicEnabled);
+    await prefs.setString('themeId', _palette.id);
+    await prefs.setString('musicTrack', _musicTrack);
     await prefs.setBool('vibrationEnabled', vibrationEnabled);
     await prefs.setBool('effectsEnabled', effectsEnabled);
     await prefs.setBool('joystickEnabled', joystickEnabled);
@@ -125,7 +135,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
         burst.forward(from: 0);
         burstExpiry?.cancel();
         // Remove the overlay even if the animation ticker stalls on a device.
-        burstExpiry = Timer(const Duration(milliseconds: 700), _hideBurst);
+        burstExpiry = Timer(Duration(milliseconds: 700), _hideBurst);
       }
       if (vibrationEnabled) HapticFeedback.heavyImpact();
     }
@@ -147,7 +157,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       if (!game.started || game.over || game.paused || game.piecesLocked != _lastLocks) {
         unawaited(_persistNow());
       } else {
-        _saveDebounce = Timer(const Duration(milliseconds: 150), () => unawaited(_persistNow()));
+        _saveDebounce = Timer(Duration(milliseconds: 150), () => unawaited(_persistNow()));
       }
     }
     _lastLocks = game.piecesLocked;
@@ -157,7 +167,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   void _syncAudio() {
     unawaited(audio.sync(game, musicEnabled: musicEnabled,
       effectsEnabled: soundEnabled, foreground: _foreground && !_home,
-      musicVolume: musicVolume, effectsVolume: effectsVolume));
+      musicVolume: musicVolume, effectsVolume: effectsVolume, musicTrack: _musicTrack));
   }
 
   void _rotate() {
@@ -192,10 +202,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     if (_loading) return;
     if (confirm && (game.saveState() != null || _savedState != null)) {
       final replace = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
-        title: const Text('Start a new game?'),
-        content: const Text('Your current saved game will be replaced. Your personal best is kept.'),
-        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('New game'))],
+        title: Text('Start a new game?'),
+        content: Text('Your current saved game will be replaced. Your personal best is kept.'),
+        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text('New game'))],
       ));
       if (replace != true || !mounted) return;
     }
@@ -230,63 +240,63 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   }
 
   Widget _volumeSlider(String label, double value, bool enabled, ValueChanged<double> onChanged) => Column(
-    children: [Text('$label · ${(value * 100).round()}%', style: const TextStyle(color: muted)),
+    children: [Text('$label · ${(value * 100).round()}%', style: TextStyle(color: _palette.muted)),
       Slider(semanticFormatterCallback: (v) => '${(v * 100).round()} percent',
         value: value, divisions: 20, onChanged: enabled ? onChanged : null,
         onChangeEnd: (_) => _saveSettings())],
   );
 
   void _showHowToPlay() => showModalBottomSheet<void>(context: context, showDragHandle: true,
-    isScrollControlled: true, backgroundColor: panel, builder: (context) => SafeArea(
-      child: SingleChildScrollView(child: Padding(padding: const EdgeInsets.all(24), child: Column(
+    isScrollControlled: true, backgroundColor: _palette.panel, builder: (context) => SafeArea(
+      child: SingleChildScrollView(child: Padding(padding: EdgeInsets.all(24), child: Column(
         mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('Find your flow', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          const Text('Fill a complete horizontal row to clear it. Clear 10 rows to reach the next level.'),
-          const SizedBox(height: 16),
-          const Text('Joystick: hold left or right to move, pull down for a soft drop, push up once to rotate.'),
-          const SizedBox(height: 12),
-          const Text('Tap the board or ROTATE to turn a piece. DROP lands it immediately. The faint outline shows its landing position.'),
-          const SizedBox(height: 12),
-          const Text('Prefer buttons? Turn off Joystick controls in Settings. You can adjust joystick speed, music and effects volume there too.'),
-          const SizedBox(height: 12),
-          const Text('Your game saves automatically. Use Home to pause it, then Continue when you return.'),
-          const SizedBox(height: 20),
-          FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Got it')),
+          Text('Find your flow', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          SizedBox(height: 16),
+          Text('Fill a complete horizontal row to clear it. Clear 10 rows to reach the next level.'),
+          SizedBox(height: 16),
+          Text('Joystick: hold left or right to move, pull down for a soft drop, push up once to rotate.'),
+          SizedBox(height: 12),
+          Text('Tap the board or ROTATE to turn a piece. DROP lands it immediately. The faint outline shows its landing position.'),
+          SizedBox(height: 12),
+          Text('Prefer buttons? Turn off Joystick controls in Settings. You can adjust joystick speed, music and effects volume there too.'),
+          SizedBox(height: 12),
+          Text('Your game saves automatically. Use Home to pause it, then Continue when you return.'),
+          SizedBox(height: 20),
+          FilledButton(onPressed: () => Navigator.pop(context), child: Text('Got it')),
         ]))),
     ));
 
   Widget _buildHome() => Center(child: SingleChildScrollView(child: Padding(
-    padding: const EdgeInsets.all(24), child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 420),
+    padding: EdgeInsets.all(24), child: ConstrainedBox(constraints: BoxConstraints(maxWidth: 420),
     child: Column(mainAxisSize: MainAxisSize.min, children: [
-      const Icon(Icons.auto_awesome_rounded, color: Color(0xFF25E5FF), size: 60),
-      const SizedBox(height: 16),
-      const Text('ZEN BLOCKS', textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 32, letterSpacing: 3, fontWeight: FontWeight.w800)),
-      const Text('NEON AURORA', style: TextStyle(color: muted, letterSpacing: 4)),
-      const SizedBox(height: 12),
-      const Text('Find your flow in neon light.', style: TextStyle(color: muted)),
-      const SizedBox(height: 28),
-      Text('PERSONAL BEST  $highScore', style: const TextStyle(color: cream, fontSize: 18)),
-      const SizedBox(height: 24),
-      if (_loading) const Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator()),
+      TBlockMark(size: 76, color: _palette.accent),
+      SizedBox(height: 16),
+      Text('T-BLOCK AURORA', textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 28, letterSpacing: 2, fontWeight: FontWeight.w800)),
+      Text(_palette.name.toUpperCase(), style: TextStyle(color: _palette.muted, letterSpacing: 4)),
+      SizedBox(height: 12),
+      Text('Find your flow, one block at a time.', style: TextStyle(color: _palette.muted)),
+      SizedBox(height: 28),
+      Text('PERSONAL BEST  $highScore', style: TextStyle(color: cream, fontSize: 18)),
+      SizedBox(height: 24),
+      if (_loading) Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator()),
       if (_savedState != null) ...[
         Text('Saved game · Score ${_savedState!['score']} · Level ${_savedState!['level']}',
-          style: const TextStyle(color: muted)),
-        const SizedBox(height: 10),
+          style: TextStyle(color: _palette.muted)),
+        SizedBox(height: 10),
         SizedBox(width: double.infinity, child: FilledButton.icon(
-          onPressed: _loading ? null : _continueGame, icon: const Icon(Icons.play_arrow_rounded), label: const Text('Continue'))),
+          onPressed: _loading ? null : _continueGame, icon: Icon(Icons.play_arrow_rounded), label: Text('Continue'))),
       ],
       SizedBox(width: double.infinity, child: OutlinedButton.icon(
-        onPressed: _loading ? null : _startNewGame, icon: const Icon(Icons.add_rounded),
+        onPressed: _loading ? null : _startNewGame, icon: Icon(Icons.add_rounded),
         label: Text(_savedState == null ? 'Start playing' : 'Start new game'))),
-      const SizedBox(height: 12),
+      SizedBox(height: 12),
       Wrap(alignment: WrapAlignment.center, spacing: 12, children: [
-        TextButton.icon(onPressed: _showHowToPlay, icon: const Icon(Icons.help_outline), label: const Text('How to play')),
-        IconButton(tooltip: 'Settings', onPressed: _showSettings, icon: const Icon(Icons.tune_rounded)),
+        TextButton.icon(onPressed: _showHowToPlay, icon: Icon(Icons.help_outline), label: Text('How to play')),
+        IconButton(tooltip: 'Settings', onPressed: _showSettings, icon: Icon(Icons.tune_rounded)),
       ]),
-      const SizedBox(height: 20),
-      const Text('Offline play · Saved on this device · v1.2.0', style: TextStyle(color: muted, fontSize: 11)),
+      SizedBox(height: 20),
+      Text('Offline play · Saved on this device · v1.3.0', style: TextStyle(color: _palette.muted, fontSize: 11)),
     ])),
   )));
 
@@ -344,42 +354,59 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   }
 
   Widget _stat(String label, String value) => Expanded(child: Container(
-    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 9),
-    decoration: BoxDecoration(gradient: const LinearGradient(colors: [Color(0xFF172B68), Color(0xFF211044)]), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFF5C72D9).withValues(alpha: .65))),
-    child: Column(children: [Text(label.toUpperCase(), style: const TextStyle(color: muted, fontSize: 10, letterSpacing: 1.4)),
-      const SizedBox(height: 4), Text(value, style: const TextStyle(color: cream, fontSize: 20, fontWeight: FontWeight.w700))]),
+    padding: EdgeInsets.symmetric(vertical: 10, horizontal: 9),
+    decoration: BoxDecoration(gradient: LinearGradient(colors: _palette.stats), borderRadius: BorderRadius.circular(14), border: Border.all(color: _palette.accent.withValues(alpha: .4))),
+    child: Column(children: [Text(label.toUpperCase(), style: TextStyle(color: _palette.muted, fontSize: 10, letterSpacing: 1.4)),
+      SizedBox(height: 4), Text(value, style: TextStyle(color: cream, fontSize: 20, fontWeight: FontWeight.w700))]),
   ));
 
   Widget _control(IconData icon, String label, VoidCallback action) => Expanded(
     child: Semantics(button: true, label: label, child: Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 3),
-      child: Material(color: const Color(0xFF18265B), borderRadius: BorderRadius.circular(16),
+      padding: EdgeInsets.symmetric(horizontal: 3),
+      child: Material(color: _palette.control, borderRadius: BorderRadius.circular(16),
         child: InkWell(borderRadius: BorderRadius.circular(16), onTap: () => _act(action),
           child: SizedBox(height: 62, child: Column(mainAxisAlignment: MainAxisAlignment.center,
-            children: [Icon(icon, color: cream, size: 25), Text(label, style: const TextStyle(fontSize: 10, color: muted))])))),
+            children: [Icon(icon, color: cream, size: 25), Text(label, style: TextStyle(fontSize: 10, color: _palette.muted))])))),
     )),
   );
 
-  void _showSettings() => showModalBottomSheet<void>(context: context, backgroundColor: panel,
+  void _showSettings() => showModalBottomSheet<void>(context: context, backgroundColor: _palette.panel,
     showDragHandle: true, isScrollControlled: true, builder: (context) => StatefulBuilder(builder: (context, update) =>
-      SafeArea(child: SingleChildScrollView(child: Padding(padding: const EdgeInsets.all(20), child: Column(mainAxisSize: MainAxisSize.min,
-        children: [const Text('Aurora settings', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-          SwitchListTile(title: const Text('Background music'), value: musicEnabled, onChanged: (v) {
+      Theme(data: _themeData, child: SafeArea(child: SingleChildScrollView(child: Padding(padding: EdgeInsets.all(20), child: Column(mainAxisSize: MainAxisSize.min,
+        children: [Text('Personalize your game', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          SizedBox(height: 16),
+          DropdownButtonFormField<String>(key: ValueKey('theme-selector'), value: _palette.id, isExpanded: true,
+            decoration: InputDecoration(labelText: 'Visual theme', border: OutlineInputBorder()),
+            items: gamePalettes.map((theme) => DropdownMenuItem(value: theme.id, child: Row(children: [
+              Container(width: 18, height: 18, decoration: BoxDecoration(color: theme.accent, borderRadius: BorderRadius.circular(4))),
+              SizedBox(width: 10), Text(theme.name),
+            ]))).toList(),
+            onChanged: (id) { if (id == null) return; update(() => _palette = paletteForId(id)); setState(() {}); _saveSettings(); }),
+          SizedBox(height: 14),
+          DropdownButtonFormField<String>(key: ValueKey('music-selector'), value: _musicTrack, isExpanded: true,
+            decoration: InputDecoration(labelText: 'Music track', border: OutlineInputBorder()),
+            items: musicTracks.map((track) => DropdownMenuItem(value: track.id, child: Text(track.label,
+              overflow: TextOverflow.ellipsis))).toList(),
+            onChanged: (id) { if (id == null) return; update(() => _musicTrack = trackForId(id).id); setState(() {}); _syncAudio(); _saveSettings(); }),
+          Padding(padding: EdgeInsets.only(top: 8), child: Text(trackForId(_musicTrack).mood,
+            style: TextStyle(color: _palette.muted, fontSize: 12))),
+          Text('Music changes while playing; paused games stay silent.', style: TextStyle(color: _palette.muted, fontSize: 11)),
+          SwitchListTile(title: Text('Background music'), value: musicEnabled, onChanged: (v) {
             update(() => musicEnabled = v); setState(() {}); _syncAudio(); _saveSettings();
           }),
           _volumeSlider('Music volume', musicVolume, musicEnabled, (v) {
             update(() => musicVolume = v); setState(() {}); _syncAudio();
           }),
-          SwitchListTile(title: const Text('Game sound effects'), value: soundEnabled, onChanged: (v) {
+          SwitchListTile(title: Text('Game sound effects'), value: soundEnabled, onChanged: (v) {
             update(() => soundEnabled = v); setState(() {}); _syncAudio(); _saveSettings();
           }),
           _volumeSlider('Effects volume', effectsVolume, soundEnabled, (v) {
             update(() => effectsVolume = v); setState(() {}); _syncAudio();
           }),
-          SwitchListTile(title: const Text('Touch vibration'), value: vibrationEnabled, onChanged: (v) {
+          SwitchListTile(title: Text('Touch vibration'), value: vibrationEnabled, onChanged: (v) {
             update(() => vibrationEnabled = v); setState(() {}); _saveSettings();
           }),
-          SwitchListTile(title: const Text('Joystick controls'), value: joystickEnabled, onChanged: (v) {
+          SwitchListTile(title: Text('Joystick controls'), value: joystickEnabled, onChanged: (v) {
             update(() => joystickEnabled = v); setState(() {}); _saveSettings();
           }),
           if (joystickEnabled) Column(children: [
@@ -388,42 +415,42 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
               onChanged: (v) { update(() => joystickRepeat = 220 - v.round()); setState(() {}); },
               onChangeEnd: (_) => _saveSettings()),
           ]),
-          SwitchListTile(title: const Text('Spectacular effects'), value: effectsEnabled, onChanged: (v) {
+          SwitchListTile(title: Text('Spectacular effects'), value: effectsEnabled, onChanged: (v) {
             update(() => _setEffectsEnabled(v));
           }),
-          const Text('Neon Aurora · 1.2.0', style: TextStyle(color: muted, fontSize: 12)),
-          const Padding(padding: EdgeInsets.all(12), child: Text('Original ambient music and game sounds are bundled for offline play. Music pauses when the game is paused or the app is in the background.',
-            textAlign: TextAlign.center, style: TextStyle(color: muted, fontSize: 12))),
-        ]))))));
+          Text('T-Block Aurora · 1.3.0', style: TextStyle(color: _palette.muted, fontSize: 12)),
+          Padding(padding: EdgeInsets.all(12), child: Text('Original ambient music and game sounds are bundled for offline play. Music pauses when the game is paused or the app is in the background.',
+            textAlign: TextAlign.center, style: TextStyle(color: _palette.muted, fontSize: 12))),
+        ])))))));
 
   @override
   Widget build(BuildContext context) {
     final next = game.nextKind;
-    return PopScope(canPop: _home, onPopInvokedWithResult: (didPop, result) {
+    return Theme(data: _themeData, child: PopScope(canPop: _home, onPopInvokedWithResult: (didPop, result) {
       if (!didPop) _returnHome();
     }, child: Scaffold(body: Container(
-      decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF090B31), Color(0xFF251054), Color(0xFF071638)])),
-      child: Stack(children: [Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: AuroraPainter(aurora, game.level, effectsEnabled))))),
+      decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: _palette.background)),
+      child: Stack(children: [Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: AuroraPainter(aurora, game.level, effectsEnabled, palette: _palette))))),
       SafeArea(child: _home ? _buildHome() : LayoutBuilder(builder: (context, constraints) {
       final available = constraints.maxHeight;
       final boardHeightPx = (available - (joystickEnabled ? 290 : 230)).clamp(200.0, 900.0);
-      return SingleChildScrollView(child: Padding(padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+      return SingleChildScrollView(child: Padding(padding: EdgeInsets.fromLTRB(10, 8, 10, 8),
         child: Column(children: [
-          Row(children: [const Icon(Icons.auto_awesome_rounded, color: Color(0xFF25E5FF), size: 28),
-            const SizedBox(width: 8), const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
-              children: [Text('ZEN BLOCKS', style: TextStyle(color: cream, fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: 2)),
-                Text('NEON AURORA', style: TextStyle(color: muted, fontSize: 10, letterSpacing: 3))])),
-            IconButton(tooltip: 'Settings', onPressed: _showSettings, icon: const Icon(Icons.tune_rounded, color: cream)),
+          Row(children: [TBlockMark(size: 32, color: _palette.accent),
+            SizedBox(width: 8), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
+              children: [Text('T-BLOCK', style: TextStyle(color: cream, fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: 2)),
+                Text(_palette.name.toUpperCase(), style: TextStyle(color: _palette.muted, fontSize: 10, letterSpacing: 2))])),
+            IconButton(tooltip: 'Settings', onPressed: _showSettings, icon: Icon(Icons.tune_rounded, color: cream)),
             IconButton(tooltip: game.paused ? 'Resume' : 'Pause', onPressed: game.togglePause,
               icon: Icon(game.paused ? Icons.play_arrow_rounded : Icons.pause_rounded, color: cream))]),
-          const SizedBox(height: 14),
-          Row(children: [_stat('Score', '${game.score}'), const SizedBox(width: 8),
-            _stat('Level', '${game.level}'), const SizedBox(width: 8), _stat('Best', '$highScore'),
-            const SizedBox(width: 8), SizedBox(width: 62, child: Column(children: [
-              const Text('NEXT', style: TextStyle(color: muted, fontSize: 10, letterSpacing: 1.5)),
-              SizedBox(height: 44, width: 62, child: CustomPaint(painter: NextPainter(next))),
+          SizedBox(height: 14),
+          Row(children: [_stat('Score', '${game.score}'), SizedBox(width: 8),
+            _stat('Level', '${game.level}'), SizedBox(width: 8), _stat('Best', '$highScore'),
+            SizedBox(width: 8), SizedBox(width: 62, child: Column(children: [
+              Text('NEXT', style: TextStyle(color: _palette.muted, fontSize: 10, letterSpacing: 1.5)),
+              SizedBox(height: 44, width: 62, child: CustomPaint(painter: NextPainter(next, palette: _palette))),
             ]))]),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           Center(child: GestureDetector(
               onHorizontalDragEnd: (details) {
                 if ((details.primaryVelocity ?? 0) > 0) _act(() => game.move(1, 0));
@@ -435,40 +462,40 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
               onTap: () => _act(_rotate),
               child: SizedBox(width: boardHeightPx / 2, child: AspectRatio(aspectRatio: boardWidth / boardHeight,
                 child: Container(constraints: BoxConstraints(maxHeight: boardHeightPx),
-                  decoration: BoxDecoration(color: const Color(0xE8081031), borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFF38D8FF), width: 2)),
+                  decoration: BoxDecoration(color: _palette.board, borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: _palette.accent, width: 2)),
                   clipBehavior: Clip.antiAlias, child: Stack(children: [
-                    RepaintBoundary(child: CustomPaint(painter: BoardPainter(game.visibleBoard, ghost: game.ghostPiece), size: Size.infinite)),
-                    if (burstVisible && effectsEnabled && game.canMove) Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: SparkPainter(burst))))),
+                    RepaintBoundary(child: CustomPaint(painter: BoardPainter(game.visibleBoard, ghost: game.ghostPiece, palette: _palette), size: Size.infinite)),
+                    if (burstVisible && effectsEnabled && game.canMove) Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: SparkPainter(burst, palette: _palette))))),
                     if (!game.started || game.paused || game.over)
-                      Container(color: const Color(0xE9091030), alignment: Alignment.center,
+                      Container(color: _palette.overlay, alignment: Alignment.center,
                         child: Column(mainAxisSize: MainAxisSize.min, children: [
-                          Icon(game.over ? Icons.emoji_events_outlined : Icons.pause_circle_outline, color: muted, size: 36),
-                          const SizedBox(height: 8),
+                          Icon(game.over ? Icons.emoji_events_outlined : Icons.pause_circle_outline, color: _palette.muted, size: 36),
+                          SizedBox(height: 8),
                           Text(game.over ? 'Aurora fades' : 'Paused',
-                            style: const TextStyle(color: cream, fontSize: 20, fontWeight: FontWeight.bold)),
+                            style: TextStyle(color: cream, fontSize: 20, fontWeight: FontWeight.bold)),
                           if (game.over) ...[
-                            const SizedBox(height: 8),
-                            Text('Score ${game.score}  ·  Best $highScore', style: const TextStyle(color: cream)),
-                            Text('${game.lines} lines  ·  Level ${game.level}', style: const TextStyle(color: muted)),
+                            SizedBox(height: 8),
+                            Text('Score ${game.score}  ·  Best $highScore', style: TextStyle(color: cream)),
+                            Text('${game.lines} lines  ·  Level ${game.level}', style: TextStyle(color: _palette.muted)),
                           ],
-                          const SizedBox(height: 10),
+                          SizedBox(height: 10),
                           ElevatedButton(onPressed: () {
                             if (game.paused) { game.togglePause(); _scheduleTick(); }
                             else { _startNewGame(confirm: false); }
                           }, child: Text(game.over ? 'Play again' : 'Resume')),
-                          if (game.paused) TextButton(onPressed: _startNewGame, child: const Text('Restart')),
-                          TextButton(onPressed: _returnHome, child: const Text('Home')),
+                          if (game.paused) TextButton(onPressed: _startNewGame, child: Text('Restart')),
+                          TextButton(onPressed: _returnHome, child: Text('Home')),
                         ])),
                   ])))),
             )),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           if (joystickEnabled) Row(children: [
             GameJoystick(enabled: game.canMove, repeatMilliseconds: joystickRepeat,
               onLeft: () => game.move(-1, 0),
               onRight: () => game.move(1, 0),
               onDown: game.softDrop, onRotate: _rotate),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             _control(Icons.rotate_right_rounded, 'ROTATE', _rotate),
             _control(Icons.keyboard_double_arrow_down_rounded, 'DROP', game.hardDrop),
           ]) else Row(children: [
@@ -479,12 +506,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
             _control(Icons.keyboard_double_arrow_down_rounded, 'DROP', game.hardDrop),
           ]),
         ])));
-    })) ]))));
+    })) ])))));
   }
 }
 
 class BoardPainter extends CustomPainter {
-  BoardPainter(this.cells, {this.ghost});
+  BoardPainter(this.cells, {this.ghost, this.palette = neonPalette});
+  final GamePalette palette;
   final List<List<int>> cells;
   final Piece? ghost;
   @override
@@ -493,7 +521,7 @@ class BoardPainter extends CustomPainter {
     final h = size.height / boardHeight;
     final landing = ghost;
     if (landing != null) {
-      final color = blockColors[landing.kind];
+      final color = palette.blocks[landing.kind];
       for (var row = 0; row < landing.cells.length; row++) {
         for (var col = 0; col < landing.cells[row].length; col++) {
           final x = landing.x + col, y = landing.y + row;
@@ -504,13 +532,13 @@ class BoardPainter extends CustomPainter {
         }
       }
     }
-    final grid = Paint()..color = const Color(0xFF354B91)..style = PaintingStyle.stroke..strokeWidth = 0.5;
+    final grid = Paint()..color = palette.grid..style = PaintingStyle.stroke..strokeWidth = 0.5;
     for (var y = 0; y < boardHeight; y++) {
       for (var x = 0; x < boardWidth; x++) {
         final rect = Rect.fromLTWH(x * w, y * h, w, h);
         canvas.drawRect(rect, grid);
         final v = cells[y][x];
-        if (v > 0) drawBlock(canvas, rect.deflate(1), blockColors[v - 1]);
+        if (v > 0) drawBlock(canvas, rect.deflate(1), palette.blocks[v - 1]);
       }
     }
   }
@@ -529,20 +557,15 @@ void drawBlock(Canvas canvas, Rect rect, Color color) {
 }
 
 class AuroraPainter extends CustomPainter {
-  AuroraPainter(this.animation, this.level, this.enabled) : super(repaint: animation);
+  AuroraPainter(this.animation, this.level, this.enabled, {this.palette = neonPalette}) : super(repaint: animation);
+  final GamePalette palette;
   final Animation<double> animation;
   final int level;
   final bool enabled;
   @override
   void paint(Canvas canvas, Size size) {
     final phase = enabled ? animation.value * math.pi * 2 : 0.0;
-    final palettes = <List<Color>>[
-      [const Color(0xFF00DFFF), const Color(0xFFAB47FF)],
-      [const Color(0xFF00FFC8), const Color(0xFF5C89FF)],
-      [const Color(0xFFFF48B7), const Color(0xFFFF9D3B)],
-      [const Color(0xFFAD65FF), const Color(0xFF2E8EFF)],
-      [const Color(0xFF2CF8F1), const Color(0xFFFA4CFF)],
-    ];
+    final palettes = palette.auroras;
     final colors = palettes[((level - 1) ~/ 10) % palettes.length];
     for (var i = 0; i < 3; i++) {
       final x = size.width * (.15 + i * .32) + math.sin(phase + i) * 28;
@@ -578,11 +601,12 @@ class AuroraPainter extends CustomPainter {
     }
   }
   @override
-  bool shouldRepaint(covariant AuroraPainter old) => old.animation != animation || old.level != level || old.enabled != enabled;
+  bool shouldRepaint(covariant AuroraPainter old) => old.animation != animation || old.level != level || old.enabled != enabled || old.palette != palette;
 }
 
 class SparkPainter extends CustomPainter {
-  SparkPainter(this.animation) : super(repaint: animation);
+  SparkPainter(this.animation, {this.palette = neonPalette}) : super(repaint: animation);
+  final GamePalette palette;
   final Animation<double> animation;
   @override
   void paint(Canvas canvas, Size size) {
@@ -593,15 +617,16 @@ class SparkPainter extends CustomPainter {
       final distance = 15 + progress * size.width * .48;
       final center = Offset(size.width / 2, size.height * .65);
       final point = center + Offset(math.cos(a) * distance, math.sin(a) * distance * .5);
-      canvas.drawCircle(point, 1.5 + (1 - progress) * 2.5, Paint()..color = blockColors[i % blockColors.length].withValues(alpha: 1 - progress));
+      canvas.drawCircle(point, 1.5 + (1 - progress) * 2.5, Paint()..color = palette.blocks[i % palette.blocks.length].withValues(alpha: 1 - progress));
     }
   }
   @override
-  bool shouldRepaint(covariant SparkPainter old) => old.animation != animation;
+  bool shouldRepaint(covariant SparkPainter old) => old.animation != animation || old.palette != palette;
 }
 
 class NextPainter extends CustomPainter {
-  NextPainter(this.kind);
+  NextPainter(this.kind, {this.palette = neonPalette});
+  final GamePalette palette;
   final int? kind;
   @override
   void paint(Canvas canvas, Size size) {
@@ -613,10 +638,10 @@ class NextPainter extends CustomPainter {
     for (var r = 0; r < shape.length; r++) {
       for (var c = 0; c < shape[r].length; c++) {
         if (shape[r][c] == 1) drawBlock(canvas,
-          Rect.fromLTWH(startX + c * unit, startY + r * unit, unit - 1, unit - 1), blockColors[kind!]);
+          Rect.fromLTWH(startX + c * unit, startY + r * unit, unit - 1, unit - 1), palette.blocks[kind!]);
       }
     }
   }
   @override
-  bool shouldRepaint(covariant NextPainter oldDelegate) => oldDelegate.kind != kind;
+  bool shouldRepaint(covariant NextPainter oldDelegate) => oldDelegate.kind != kind || oldDelegate.palette != palette;
 }

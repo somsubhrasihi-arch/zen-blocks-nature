@@ -16,6 +16,8 @@ jobs:
           cache: true
       - name: Generate Android platform
         run: flutter create --platforms=android --org com.zenblocks.nature .
+      - name: Apply app name and T-piece launcher icon
+        run: python tools/configure_branding.py
       - name: Install dependencies
         run: flutter pub get
       - name: Run unit tests

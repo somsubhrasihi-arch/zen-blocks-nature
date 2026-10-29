@@ -1,8 +1,11 @@
-# Zen Blocks — Neon Aurora
+# T-Block Aurora
 
 An original falling-block puzzle for Android, built with Flutter and a Neon Aurora visual theme.
 
 ## Features
+- Four selectable themes: Neon Aurora (default), Forest Calm, Solar Sunset, Ocean Drift
+- Four original offline music choices at 60, 80, 105 and 135 BPM
+- Four-square T-piece launcher icon with adaptive and monochrome variants
 - Home screen, how-to-play guide, game-over summary and restart confirmation
 - Automatic local game saves with Continue, plus a ghost-piece landing preview
 - Independent music/effects volume sliders and adjustable joystick repeat speed
@@ -98,3 +101,6 @@ The existing `.github/workflows/build-apk.yml` is preserved. A push to `main` or
 
 ## Play Store preparation
 See [PLAY_STORE_RELEASE.md](PLAY_STORE_RELEASE.md) for the unsigned release-preview workflow, upload signing setup, and remaining store requirements.
+
+## Branding and customization
+The Android display name is T-Block Aurora. The application ID, saved-game format, repository and legacy APK artifact name remain unchanged. Both build workflows apply branding through `tools/configure_branding.py`. Settings remember the theme and music selection; new installs retain Neon Aurora and Aurora Ambient by default.

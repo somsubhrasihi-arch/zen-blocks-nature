@@ -1,6 +1,6 @@
-# Zen Blocks release preparation
+# T-Block Aurora release preparation
 
-Version 1.2.0 adds resumable local games, a landing preview, home and game-over
+Version 1.3.0 retains resumable local games, a landing preview, home and game-over
 flows, gravity-safe controls, adjustable joystick speed, and audio volume sliders.
 
 ## Two independent build workflows
@@ -38,7 +38,7 @@ refuses to change it silently.
 ## Before closed testing
 
 1. Create and verify your Play Console developer account.
-2. Finalize an original launcher icon and store branding.
+2. Review the included original T-piece launcher icon and app name, then prepare store artwork.
 3. Prepare the listing, screenshots, support contact, content rating, target
    audience and ads declarations.
 4. Publish an accurate app-specific privacy policy and link it inside the app;

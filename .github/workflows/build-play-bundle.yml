@@ -25,6 +25,8 @@ jobs:
           cache: true
       - name: Generate Android platform
         run: flutter create --platforms=android --org com.zenblocks.nature .
+      - name: Apply app name and T-piece launcher icon
+        run: python tools/configure_branding.py
       - name: Configure release identity, target API and signing
         env:
           ZEN_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ZEN_UPLOAD_KEYSTORE_BASE64 }}

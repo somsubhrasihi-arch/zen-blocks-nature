@@ -62,3 +62,47 @@ phrase('clear', [72,76,79,84], .07, .5)
 phrase('levelUp', [60,64,67,72,76,79,84], .09, .7)
 phrase('gameOver', [64,60,55,48], .22, .9)
 print('Generated original ambient score and six event cues in', OUT)
+
+
+# Optional music choices. The original aurora track above remains the default.
+def groove(name, bpm, chords, energy):
+    beat = 60 / bpm
+    duration = 32 * beat
+    output = np.zeros(round(duration * RATE))
+    rng = np.random.default_rng(77 + bpm)
+    for bar in range(8):
+        chord = chords[bar % len(chords)]
+        start = round(bar * 4 * beat * RATE)
+        count = min(round(4 * beat * RATE), len(output)-start)
+        t = np.arange(count)/RATE
+        pad = sum(np.sin(2*np.pi*frequency(note)*t) for note in chord)/len(chord)
+        envelope = np.minimum(t/.14, 1)*np.minimum((count/RATE-t)/.25, 1)
+        output[start:start+count] += .12 * pad * envelope
+        for eighth in range(8):
+            note = chord[[0,2,1,2,0,1,2,1][eighth]] + 24
+            tone = bell(note, min(.7, beat*.9), .14 if energy < 2 else .18)
+            offset = round((bar*4*beat+eighth*beat/2)*RATE)
+            length = min(len(tone), len(output)-offset)
+            output[offset:offset+length] += tone[:length]
+        if energy:
+            for pulse in range(4):
+                t = np.arange(round(.16*RATE))/RATE
+                kick = .13 * np.sin(2*np.pi*(70*t+5*(1-np.exp(-t*25))))*np.exp(-t*25)
+                offset = round((bar*4+pulse)*beat*RATE)
+                length = min(len(kick),len(output)-offset)
+                output[offset:offset+length] += kick[:length]
+                if energy > 1:
+                    t = np.arange(round(.06*RATE))/RATE
+                    hat = .035*rng.uniform(-1,1,len(t))*np.exp(-t*70)
+                    offset = round((bar*4+pulse+.5)*beat*RATE)
+                    length = min(len(hat),len(output)-offset)
+                    output[offset:offset+length] += hat[:length]
+    edge = round(.08*RATE)
+    output[:edge] *= np.linspace(0,1,edge)
+    output[-edge:] *= np.linspace(1,0,edge)
+    render(name, output)
+
+groove('forest_flow', 80, [(48,55,64),(45,52,60),(41,48,57),(43,50,59)], 0)
+groove('ocean_pulse', 105, [(50,57,65),(46,53,62),(48,55,64),(45,52,60)], 1)
+groove('neon_rush', 135, [(45,52,60),(48,55,64),(43,50,59),(41,48,57)], 2)
+print('Generated optional 80, 105 and 135 BPM original tracks.')

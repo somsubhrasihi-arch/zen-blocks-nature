@@ -102,6 +102,8 @@ void main() {
     await tester.tap(find.byTooltip('Settings'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
+    await tester.ensureVisible(find.text('Spectacular effects'));
+    await tester.pump();
     await tester.tap(find.text('Spectacular effects'));
     await tester.pump();
     final stopped = aurora.value;

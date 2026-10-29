@@ -1,6 +1,7 @@
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'game.dart';
+import 'customization.dart';
 
 enum SoundCue { start, rotate, lock, clear, levelUp, gameOver }
 
@@ -36,6 +37,7 @@ abstract class AudioBackend {
   Future<void> effect(SoundCue cue);
   Future<void> stopEffects();
   Future<void> volumes(double music, double effects);
+  Future<void> track(String asset);
   Future<void> dispose();
 }
 
@@ -83,6 +85,12 @@ class DeviceAudioBackend implements AudioBackend {
   }
 
   @override
+  Future<void> track(String asset) async {
+    await _music?.stop();
+    await _music?.setSource(AssetSource(asset));
+  }
+
+  @override
   Future<void> dispose() async {
     await _music?.dispose();
     for (final player in _effects.values) { await player.dispose(); }
@@ -99,6 +107,7 @@ class GameAudio {
   Future<void>? _initialization;
   bool _disposed = false, _playing = false, _effects = false, _audible = false;
   double _musicVolume = .28, _effectsVolume = .8;
+  String _trackId = 'aurora';
 
   Future<void> _enqueue(Future<void> Function() action) {
     _queue = _queue.then((_) async {
@@ -117,7 +126,10 @@ class GameAudio {
 
   Future<void> sync(ZenGame game, {required bool musicEnabled,
     required bool effectsEnabled, required bool foreground,
-    double musicVolume = .28, double effectsVolume = .8}) {
+    double musicVolume = .28, double effectsVolume = .8, String musicTrack = 'aurora'}) {
+    final selectedTrack = trackForId(musicTrack);
+    final trackChanged = selectedTrack.id != _trackId;
+    _trackId = selectedTrack.id;
     musicVolume = musicVolume.clamp(0.0, 1.0).toDouble();
     effectsVolume = effectsVolume.clamp(0.0, 1.0).toDouble();
     final cues = _tracker.update(game);
@@ -134,10 +146,11 @@ class GameAudio {
     _musicVolume = musicVolume; _effectsVolume = effectsVolume;
     // Game over may play its final cue while music is stopped.
     final sounds = audible ? cues : <SoundCue>[];
-    if (!musicChanged && !silence && !volumeChanged && sounds.isEmpty) return _queue;
+    if (!musicChanged && !silence && !volumeChanged && !trackChanged && sounds.isEmpty) return _queue;
     return _enqueue(() async {
+      if (trackChanged) await _backend.track(selectedTrack.asset);
       if (volumeChanged) await _backend.volumes(musicVolume, effectsVolume);
-      if (musicChanged) await _backend.music(playing);
+      if (musicChanged || trackChanged) await _backend.music(playing);
       if (silence) await _backend.stopEffects();
       for (final cue in sounds) { await _backend.effect(cue); }
     });
