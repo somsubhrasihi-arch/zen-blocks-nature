@@ -54,7 +54,8 @@ class _AdventureHubState extends State<AdventureHub> {
   @override
   Widget build(BuildContext context) => AnimatedBuilder(animation: widget.progress, builder: (context, _) => Scaffold(
     backgroundColor: p.background.first,
-    appBar: AppBar(backgroundColor: p.panel, title: Text(['Journey', 'Block Shop', 'Achievements'][tab]),
+    appBar: AppBar(backgroundColor: p.panel, leading: Padding(padding: const EdgeInsets.all(6),
+      child: ArcadeIconButton(tooltip: 'Back', icon: Icons.arrow_back_rounded, onPressed: () => Navigator.pop(context), palette: p)), title: Text(['Journey', 'Block Shop', 'Achievements'][tab]),
       actions: [Padding(padding: const EdgeInsets.only(right: 16), child: Center(child: Row(children: [
         Icon(Icons.monetization_on_rounded, color: p.blocks[1], size: 22), const SizedBox(width: 5),
         Text('${data.coins}', style: const TextStyle(fontWeight: FontWeight.w800)),

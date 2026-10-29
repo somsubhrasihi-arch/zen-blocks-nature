@@ -156,7 +156,7 @@ void main() {
     await tester.tap(find.text('Journey · 0/30'));await tester.pump();await tester.pump(const Duration(milliseconds:350));
     expect(find.text('Play stage 1'),findsOneWidget);
     await capture(tester,'08-journey');
-    await tester.tap(find.text('Play stage 1'));await tester.pump();await tester.pump(const Duration(milliseconds:350));
+    await tester.tap(find.text('Play stage 1'));await tester.pump();await tester.pump(const Duration(milliseconds:700));await tester.pump();
     final dynamic state=tester.state(find.byType(GameScreen));
     expect(state.game.stage.id,1);
     clearOne(state.game);clearOne(state.game);
