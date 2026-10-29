@@ -83,10 +83,15 @@ class Achievement {
 }
 const achievements = [
   Achievement('firstLine', 'The First Spark', 'Clear your first line', 25, 1),
-  Achievement('tenRuns', 'Finding Your Flow', 'Finish 10 runs', 100, 10),
+  Achievement('tenRuns', 'Finding Your Flow', 'Finish 10 runs with at least one line cleared', 100, 10),
   Achievement('hundredLines', 'Century Club', 'Clear 100 lines across finished runs', 150, 100),
   Achievement('firstStage', 'Adventure Begins', 'Complete your first Journey stage', 30, 1),
   Achievement('tenStages', 'First Light Champion', 'Complete 10 Journey stages', 150, 10),
   Achievement('allStages', 'Cosmic Champion', 'Complete all 30 Journey stages', 500, 30),
   Achievement('sixtyStars', 'Star Collector', 'Earn 60 Journey stars', 300, 60),
+  Achievement('sprintFirst', 'Across the Finish Line', 'Finish your first 40-line Sprint', 75, 1),
+  Achievement('sprintSwift', 'Quick Stack', 'Finish Sprint in five minutes or less', 100, 1),
+  Achievement('dailyFirst', 'Today’s Triumph', 'Claim your first Daily Challenge reward', 50, 1),
+  Achievement('dailySeven', 'Daily Explorer', 'Complete Daily Challenges on seven different days', 150, 7),
+  Achievement('streakSeven', 'Seven-Day Spark', 'Reach a seven-day Daily Challenge streak', 200, 7),
 ];

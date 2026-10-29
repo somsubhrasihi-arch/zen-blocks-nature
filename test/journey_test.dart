@@ -134,9 +134,9 @@ void main() {
     final failed=await store.settle(runId:'fail',lines:0,pieces:1,stageId:1);
     expect(failed.coins,0);expect(store.data.stars,isEmpty);
     final first=await store.settle(runId:'classic',lines:1,pieces:10);
-    expect(first.coins,31); // 5 line + 1 block bonus + 25 achievement
+    expect(first.coins,30); // 5 line + 25 achievement
     final next=await store.settle(runId:'classic2',lines:1,pieces:10);
-    expect(next.coins,6);expect(next.achievements,isEmpty);
+    expect(next.coins,5);expect(next.achievements,isEmpty);
   });
   test('Journey sessions retain mode and identity through session storage', () async {
     final game=ZenGame()..start(journeyStage:journeyStages[12]);

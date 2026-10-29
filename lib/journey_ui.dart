@@ -105,12 +105,17 @@ class _AdventureHubState extends State<AdventureHub> {
   List<Widget> shop() => [
     card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text('Make it yours', style: TextStyle(color: p.accent, fontSize: 22, fontWeight: FontWeight.w800)),
-      const SizedBox(height: 8), Text('Earn Block Coins in Classic, Journey and achievements. Unlock a look, then equip it.', style: TextStyle(color: p.muted, height: 1.4)),
+      const SizedBox(height: 8), Text('Earn Block Coins in Classic, Journey, Sprint, Daily Challenge and achievements. Unlock a look, then equip it.', style: TextStyle(color: p.muted, height: 1.4)),
     ])),
     for (final kind in CosmeticKind.values) ...[
       Padding(padding: const EdgeInsets.fromLTRB(4, 12, 4, 12), child: Text(kind == CosmeticKind.skin ? 'BLOCK SKINS' : 'CLEAR EFFECTS', style: TextStyle(color: p.accent, fontWeight: FontWeight.w800, letterSpacing: 1))),
       for (final item in shopItems.where((i) => i.kind == kind)) shopCard(item),
     ],
+    card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('REWARD GUIDE', style: TextStyle(color: p.accent, fontWeight: FontWeight.w800, letterSpacing: 1)),
+      const SizedBox(height: 8), Text('Classic: 5 coins per cleared line. Journey: first clears and better stars. Sprint: completion, speed and personal bests. Daily Challenge: 120–180 coins once per UTC day.', style: TextStyle(color: p.muted, fontSize: 12, height: 1.5)),
+      const SizedBox(height: 8), Text('Journey replay and repeat Sprint payouts share a 100-coin daily limit. First clears, star improvements, records and achievements are extra.', style: TextStyle(color: p.muted, fontSize: 12, height: 1.5)),
+    ])),
     Center(child: Text('Progress and coins are saved on this device.', style: TextStyle(color: p.muted, fontSize: 11))),
     const SizedBox(height: 12),
   ];

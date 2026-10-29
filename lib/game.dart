@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'campaign.dart';
+import 'play_modes.dart';
 
 const int boardWidth = 10;
 const int boardHeight = 20;
@@ -24,10 +25,30 @@ class Piece {
 }
 
 class ZenGame extends ChangeNotifier {
-  ZenGame({Random? random}) : _random = random ?? Random() {
+  ZenGame({Random? random, int Function()? nowMilliseconds}) : _random = random ?? Random() {
+    _now = nowMilliseconds ?? () => _clock.elapsedMilliseconds;
     reset();
   }
   final Random _random;
+  final Stopwatch _clock = Stopwatch()..start();
+  late final int Function() _now;
+  int _elapsed = 0;
+  int? _segment;
+  int _dailyBag = 0;
+  PlayMode mode = PlayMode.classic;
+  DailyChallenge? daily;
+  int get elapsedMilliseconds => _elapsed + (_segment == null ? 0 : max(0, _now() - _segment!));
+  void _freezeClock() { _elapsed = elapsedMilliseconds; _segment = null; }
+  void _resumeClock() { if (mode == PlayMode.sprint && _segment == null && started && !paused && !over && !completed) _segment = _now(); }
+  int get initialLevel => stage?.startLevel ?? daily?.startLevel ?? 1;
+  int get initialObstacles => stage?.obstacleCount ?? daily?.obstacleCount ?? 0;
+  StageGoal? get objectiveGoal => mode == PlayMode.sprint ? StageGoal.lines : stage?.goal ?? daily?.goal;
+  int get goalTarget => mode == PlayMode.sprint ? 40 : stage?.target ?? daily?.target ?? 0;
+  String get objective => mode == PlayMode.sprint ? 'Clear 40 lines' : stage?.objective ?? daily?.objective ?? '';
+  String get modeLabel => stage != null ? 'Journey · Stage ${stage!.id}' : modeName(mode);
+  void _finishGoal() {
+    if (goalTarget > 0 && goalProgress >= goalTarget) { completed = true; active = null; _freezeClock(); }
+  }
   late List<List<int>> board;
   Piece? active;
   int? nextKind;
@@ -35,11 +56,11 @@ class ZenGame extends ChangeNotifier {
   String runId = '';
   bool completed = false;
   Set<int> obstacleRows = {};
-  int get obstaclesCleared => (stage?.obstacleCount ?? 0) - obstacleRows.length;
-  int get goalProgress => switch (stage?.goal) {
+  int get obstaclesCleared => initialObstacles - obstacleRows.length;
+  int get goalProgress => switch (objectiveGoal) {
     StageGoal.lines => lines, StageGoal.score => score, StageGoal.excavation => obstaclesCleared, _ => 0,
   };
-  int get earnedStars => completed ? stage!.starsFor(piecesLocked) : 0;
+  int get earnedStars => completed && stage != null ? stage!.starsFor(piecesLocked) : 0;
   int score = 0;
   int piecesLocked = 0;
   int lines = 0;
@@ -54,13 +75,15 @@ class ZenGame extends ChangeNotifier {
 
   int _drawKind() {
     if (_bag.isEmpty) {
-      _bag.addAll(List.generate(7, (i) => i)..shuffle(_random));
+      _bag.addAll(List.generate(7, (i) => i)..shuffle(daily == null ? _random : Random(daily!.seed + _dailyBag++ * 7919)));
     }
     return _bag.removeLast();
   }
 
   void reset() {
     board = List.generate(boardHeight, (_) => List.filled(boardWidth, 0));
+    _elapsed = 0; _segment = null; _dailyBag = 0;
+    mode = PlayMode.classic; daily = null;
     stage = null; completed = false; obstacleRows = {}; runId = '';
     score = 0;
     piecesLocked = 0;
@@ -76,28 +99,35 @@ class ZenGame extends ChangeNotifier {
     notifyListeners();
   }
 
-  void start({JourneyStage? journeyStage}) {
+  void start({JourneyStage? journeyStage, PlayMode playMode = PlayMode.classic, String? dailyDay}) {
     if (started && !over && !completed) return;
     reset();
     stage = journeyStage;
+    mode = journeyStage != null ? PlayMode.journey : playMode == PlayMode.journey ? PlayMode.classic : playMode;
+    daily = mode == PlayMode.daily ? dailyForDay(dailyDay ?? utcDay(DateTime.now())) : null;
+    if (mode == PlayMode.daily && daily == null) mode = PlayMode.classic;
+    if (daily != null) { _bag.clear(); _dailyBag = 0; nextKind = _drawKind(); }
     runId = '${DateTime.now().microsecondsSinceEpoch}-${_random.nextInt(1 << 30)}';
-    level = stage?.startLevel ?? 1;
-    if (stage != null) {
-      for (var row = 0; row < stage!.obstacleCount; row++) {
+    level = initialLevel;
+    if (initialObstacles > 0) {
+      for (var row = 0; row < initialObstacles; row++) {
         final y = boardHeight - 1 - row;
-        final hole = (row * 3 + stage!.id) % (boardWidth - 1);
+        final hole = (row * 3 + (stage?.id ?? daily!.seed)) % (boardWidth - 1);
         board[y] = List.generate(boardWidth, (x) => x == hole || x == hole + 1 ? 0 : (row % 7) + 1);
         obstacleRows.add(y);
       }
     }
     started = true;
+    _resumeClock();
     _spawn();
     notifyListeners();
   }
 
   void togglePause() {
     if (!started || over || completed) return;
+    if (!paused) _freezeClock();
     paused = !paused;
+    if (!paused) _resumeClock();
     notifyListeners();
   }
 
@@ -115,7 +145,7 @@ class ZenGame extends ChangeNotifier {
     final piece = active;
     if (!started || over || completed || piece == null) return null;
     return {
-      'version': 1, 'stageId': stage?.id, 'runId': runId, 'obstacleRows': obstacleRows.toList(),
+      'version': 1, 'mode': mode.name, 'dailyDay': daily?.day, 'dailyBag': _dailyBag, 'elapsedMs': elapsedMilliseconds, 'stageId': stage?.id, 'runId': runId, 'obstacleRows': obstacleRows.toList(),
       'board': board.map((row) => List<int>.from(row)).toList(),
       'piece': {'kind': piece.kind, 'x': piece.x, 'y': piece.y,
         'cells': piece.cells.map((row) => List<int>.from(row)).toList()},
@@ -135,10 +165,22 @@ class ZenGame extends ChangeNotifier {
       final stageId = value['stageId'];
       if (stageId != null && (stageId is! int || stageForId(stageId) == null)) return false;
       final savedStage = stageForId(stageId as int?);
+      final rawMode = value['mode'] ?? (savedStage == null ? 'classic' : 'journey');
+      if (!PlayMode.values.any((m) => m.name == rawMode)) return false;
+      final savedMode = PlayMode.values.firstWhere((m) => m.name == rawMode);
+      if ((savedMode == PlayMode.journey) != (savedStage != null)) return false;
+      final day = value['dailyDay'];
+      if (day != null && day is! String) return false;
+      final savedDaily = savedMode == PlayMode.daily ? dailyForDay(day as String?) : null;
+      if (savedMode == PlayMode.daily && savedDaily == null || savedMode != PlayMode.daily && day != null) return false;
+      final savedElapsed = value['elapsedMs'] ?? 0;
+      final savedDailyBag = value['dailyBag'] ?? 0;
+      if (savedElapsed is! int || savedElapsed < 0 || savedElapsed > 864000000 || savedDailyBag is! int ||
+          savedDailyBag < 0 || savedDailyBag > 1000000 || savedMode == PlayMode.daily && savedDailyBag == 0) return false;
       final obstacleSource = value['obstacleRows'] ?? <int>[];
       if (obstacleSource is! List || obstacleSource.any((v) => v is! int || v < 0 || v >= boardHeight)) return false;
       final savedObstacles = obstacleSource.cast<int>().toSet();
-      if (savedObstacles.length > (savedStage?.obstacleCount ?? 0)) return false;
+      if (savedObstacles.length > (savedStage?.obstacleCount ?? savedDaily?.obstacleCount ?? 0)) return false;
       final savedRunId = value['runId'];
       if (savedRunId != null && (savedRunId is! String || savedRunId.length > 100 || savedRunId.isEmpty)) return false;
       final savedBoard = matrix(value['board']);
@@ -177,14 +219,17 @@ class ZenGame extends ChangeNotifier {
       final savedLevel = value['level'] as int;
       final savedCombo = value['combo'] as int;
       final locks = value['piecesLocked'] as int;
-      if (savedScore < 0 || savedLines < 0 || savedLevel != (savedStage?.startLevel ?? 1) + savedLines ~/ 10 ||
+      if (savedScore < 0 || savedLines < 0 || savedLevel != (savedStage?.startLevel ?? savedDaily?.startLevel ?? 1) + savedLines ~/ 10 ||
           savedCombo < -1 || locks < 0) return false;
-      final progress = switch (savedStage?.goal) {
+      final progress = switch (savedMode == PlayMode.sprint ? StageGoal.lines : savedStage?.goal ?? savedDaily?.goal) {
         StageGoal.lines => savedLines, StageGoal.score => savedScore,
-        StageGoal.excavation => savedStage!.obstacleCount - savedObstacles.length, _ => 0,
+        StageGoal.excavation => (savedStage?.obstacleCount ?? savedDaily!.obstacleCount) - savedObstacles.length, _ => 0,
       };
-      if (savedStage != null && progress >= savedStage.target) return false;
+      final target = savedMode == PlayMode.sprint ? 40 : savedStage?.target ?? savedDaily?.target ?? 0;
+      if (target > 0 && progress >= target) return false;
       if (savedObstacles.any((r) => savedBoard[r].every((v) => v == 0))) return false;
+      mode = savedMode; daily = savedDaily; _dailyBag = savedDailyBag;
+      _elapsed = savedElapsed; _segment = null;
       stage = savedStage; obstacleRows = savedObstacles; completed = false;
       runId = savedRunId as String? ?? '${DateTime.now().microsecondsSinceEpoch}-${_random.nextInt(1 << 30)}';
       board = savedBoard;
@@ -222,6 +267,7 @@ class ZenGame extends ChangeNotifier {
     active = Piece(kind, cells, x, 0);
     if (!_fits(cells, x, 0)) {
       over = true;
+      _freezeClock();
       active = null;
     }
   }
@@ -261,7 +307,7 @@ class ZenGame extends ChangeNotifier {
     if (!canMove) return;
     if (move(0, 1)) {
       score += 1;
-      if (stage?.goal == StageGoal.score && goalProgress >= stage!.target) { completed = true; active = null; }
+      if (objectiveGoal == StageGoal.score) _finishGoal();
       notifyListeners();
     } else {
       _lock();
@@ -287,6 +333,7 @@ class ZenGame extends ChangeNotifier {
         final y = p.y + r;
         if (y < 0) {
           over = true;
+          _freezeClock();
           active = null;
           notifyListeners();
           return;
@@ -302,7 +349,7 @@ class ZenGame extends ChangeNotifier {
       final base = [0, 100, 300, 500, 800][cleared];
       score += base * level + combo * 50 * level;
       lines += cleared;
-      level = (stage?.startLevel ?? 1) + lines ~/ 10;
+      level = initialLevel + lines ~/ 10;
       final fullRows = <int>{for (var y = 0; y < boardHeight; y++) if (board[y].every((v) => v != 0)) y};
       obstacleRows = {for (final y in obstacleRows) if (!fullRows.contains(y)) y + fullRows.where((r) => r > y).length};
       board = [
@@ -312,11 +359,8 @@ class ZenGame extends ChangeNotifier {
     } else {
       combo = -1;
     }
-    if (stage != null && goalProgress >= stage!.target) {
-      completed = true; active = null;
-    } else {
-      _spawn();
-    }
+    _finishGoal();
+    if (!completed) _spawn();
     notifyListeners();
   }
 

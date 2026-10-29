@@ -14,6 +14,8 @@ import 'campaign.dart';
 import 'progress_store.dart';
 import 'journey_ui.dart';
 import 'cosmetic_paint.dart';
+import 'play_modes.dart';
+import 'run_clock.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -91,7 +93,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     _settlingRun = id; _settling = true; _rewardError = null;
     try {
       final reward = await progress.settle(runId: id, lines: game.lines, pieces: game.piecesLocked,
-        stageId: game.stage?.id, completed: game.completed, stars: game.earnedStars);
+        stageId: game.stage?.id, completed: game.completed, stars: game.earnedStars,
+        mode: game.mode, dailyDay: game.daily?.day, elapsedMs: game.elapsedMilliseconds,
+        score: game.score, obstaclesCleared: game.obstaclesCleared);
       if (mounted && game.runId == id) setState(() { _runReward = reward; _settling = false; });
     } catch (_) {
       if (mounted && game.runId == id) setState(() {
@@ -181,7 +185,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     }
     lastLines = game.lines;
     _syncAnimations();
-    if (game.stage == null && game.score > highScore) {
+    if (game.mode == PlayMode.classic && game.score > highScore) {
       highScore = game.score;
       SharedPreferences.getInstance().then((p) => p.setInt('highScore', highScore));
     }
@@ -235,7 +239,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     return sessions.save(_savedState);
   }
 
-  Future<void> _startNewGame({bool confirm = true, JourneyStage? journeyStage}) async {
+  Future<void> _startNewGame({bool confirm = true, JourneyStage? journeyStage, PlayMode playMode = PlayMode.classic, String? dailyDay}) async {
     if (_loading || _settling || _rewardError != null) return;
     if (journeyStage != null && !progress.data.unlocked(journeyStage)) return;
     if (confirm && (game.saveState() != null || _savedState != null)) {
@@ -251,7 +255,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     game.reset();
     _runReward = null; _settlingRun = null; _rewardError = null;
     setState(() { _home = false; _savedState = null; });
-    game.start(journeyStage: journeyStage);
+    game.start(journeyStage: journeyStage, playMode: playMode, dailyDay: dailyDay);
     _scheduleTick();
     _syncAudio();
     unawaited(_persistNow());
@@ -303,6 +307,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
           Text('How to play', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
           SizedBox(height: 18),
           _helpRow(Icons.view_stream_rounded, 'Clear the rows', 'Fill a horizontal row. Every 10 rows increases the speed.'),
+          _helpRow(Icons.timer_rounded, 'Pick your pace', 'Sprint races to 40 lines. Daily Challenge brings a new seeded puzzle at 00:00 UTC, with one reward per day and streak bonuses.'),
           _helpRow(Icons.route_rounded, 'Take the Journey', 'Complete stage objectives. Use fewer blocks to earn up to three stars and unlock new worlds.'),
           _helpRow(Icons.shopping_bag_rounded, 'Make it yours', 'Finish runs for Block Coins. Spend them on skins and clear effects in the Shop. Rewards save on this device.'),
           _helpRow(Icons.control_camera_rounded, 'Make your move', 'Hold the joystick left or right. Pull down to fall faster; push up to rotate.'),
@@ -344,7 +349,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       SizedBox(height: 24),
       if (_loading) Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator()),
       if (_savedState != null) ...[
-        Text('${_savedState!['stageId'] == null ? 'Classic' : 'Journey · Stage ${_savedState!["stageId"]}'}  •  Score ${_savedState!["score"]}', style: TextStyle(color: _palette.muted, fontSize: 13)),
+        Text('${_savedState!['stageId'] != null ? 'Journey · Stage ${_savedState!["stageId"]}' : _savedState!['mode'] == 'sprint' ? 'Sprint' : _savedState!['mode'] == 'daily' ? 'Daily Challenge' : 'Classic'}  •  Score ${_savedState!["score"]}', style: TextStyle(color: _palette.muted, fontSize: 13)),
         SizedBox(height: 12),
         SizedBox(width: double.infinity, child: _button('Continue', Icons.play_arrow_rounded, _loading ? null : _continueGame, primary: true, height: 62)),
         SizedBox(height: 10),
@@ -356,6 +361,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       SizedBox(width: double.infinity, child: _button('Journey · ${progress.data.stars.length}/30', Icons.route_rounded,
         _loading ? null : () => _openHub(), accent: _palette.blocks[2], height: 58)),
       SizedBox(height: 10),
+      Row(children: [Expanded(child: _button('Sprint', Icons.timer_rounded, _loading ? null : () => _showModeIntro(PlayMode.sprint), height: 54)),
+        SizedBox(width: 10), Expanded(child: _button('Daily Challenge', Icons.today_rounded,
+          _loading ? null : () => _showModeIntro(PlayMode.daily), accent: _palette.blocks[3], height: 54))]),
+      SizedBox(height: 10),
       Row(children: [Expanded(child: _button('Shop · ${progress.data.coins}', Icons.shopping_bag_rounded,
           _loading ? null : () => _openHub(1), accent: _palette.blocks[1], height: 50)),
         SizedBox(width: 10), Expanded(child: _button('Achievements', Icons.emoji_events_rounded, _loading ? null : () => _openHub(2), height: 50))]),
@@ -364,9 +373,41 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
         Expanded(child: _button('How to play', Icons.sports_esports_rounded, _showHowToPlay, height: 50)),
         SizedBox(width: 10), Expanded(child: Tooltip(message: 'Settings', child: _button('Settings', Icons.tune_rounded, _showSettings, height: 50))),
       ]),
-      SizedBox(height: 22), Text('v1.5.0', style: TextStyle(color: _palette.muted.withValues(alpha: .65), fontSize: 10, letterSpacing: 1)),
+      SizedBox(height: 22), Text('v1.6.0', style: TextStyle(color: _palette.muted.withValues(alpha: .65), fontSize: 10, letterSpacing: 1)),
     ])),
   )));
+
+  void _showModeIntro(PlayMode mode) {
+    final now = DateTime.now().toUtc(), today = utcDay(DateTime.now());
+    final challenge = dailyForDay(today)!;
+    final claimable = progress.data.canClaimDaily(today);
+    final remaining = parseDay(today)!.add(Duration(days: 1)).difference(now);
+    showModalBottomSheet<void>(context: context, useSafeArea: true, isScrollControlled: true,
+      backgroundColor: _palette.panel, showDragHandle: true,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+      builder: (context) => SafeArea(child: SingleChildScrollView(child: Padding(padding: EdgeInsets.fromLTRB(24, 8, 24, 24),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [Icon(mode == PlayMode.sprint ? Icons.timer_rounded : Icons.today_rounded, color: _palette.accent, size: 28),
+            SizedBox(width: 12), Expanded(child: Text(modeName(mode), style: TextStyle(fontSize: 25, fontWeight: FontWeight.w800)))]),
+          SizedBox(height: 16),
+          if (mode == PlayMode.sprint) ...[
+            Text('40 lines. One race against yourself.', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            SizedBox(height: 12), Text('Your timer counts active play. Pausing or leaving the app stops the clock.', style: TextStyle(color: _palette.muted, height: 1.5)),
+            SizedBox(height: 12), Text(progress.data.sprintBestMs == 0 ? 'Set your first personal best.' : 'Personal best · ${formatRunTime(progress.data.sprintBestMs)}', style: TextStyle(color: _palette.accent, fontWeight: FontWeight.w700)),
+            SizedBox(height: 12), Text('Finish: 60 coins. Speed bonus: +40 within 3 minutes, +25 within 5, +10 within 8. Improve your record by at least 1 second for +15.', style: TextStyle(color: _palette.muted, height: 1.5)),
+          ] else ...[
+            Text(challenge.name, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+            SizedBox(height: 8), Text(challenge.objective, style: TextStyle(color: _palette.accent, fontSize: 20, fontWeight: FontWeight.w800)),
+            SizedBox(height: 12), Text('$today · Resets at 00:00 UTC\nNext challenge in ${remaining.inHours}h ${remaining.inMinutes % 60}m', style: TextStyle(color: _palette.muted, height: 1.5)),
+            SizedBox(height: 12), Text(claimable ? 'Today’s reward: 120 coins + streak bonus' : 'Today’s reward collected · Replays are practice', style: TextStyle(color: _palette.blocks[1], fontWeight: FontWeight.w700)),
+            SizedBox(height: 8), Text('Current streak: ${progress.data.activeDailyStreak(today)} days. Consecutive completions add +10 coins per day, up to +60. Everyone starts with the same daily board and piece sequence.', style: TextStyle(color: _palette.muted, height: 1.5)),
+          ],
+          SizedBox(height: 18),
+          Text('Journey replay and repeat Sprint payouts share a 100-coin daily limit. First clears, improved Journey stars, achievements and Sprint record bonuses are extra.', style: TextStyle(color: _palette.muted, fontSize: 12, height: 1.5)),
+          SizedBox(height: 18), SizedBox(width: double.infinity, child: _button(mode == PlayMode.sprint ? 'Start Sprint' : claimable ? 'Start challenge' : 'Practice challenge',
+            Icons.play_arrow_rounded, () { Navigator.pop(context); _startNewGame(playMode: mode, dailyDay: mode == PlayMode.daily ? today : null); }, primary: true)),
+        ])))));
+  }
 
   void _hideBurst() {
     burstExpiry?.cancel();
@@ -529,7 +570,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
                   update(() => vibrationEnabled = v); setState(() {}); _saveSettings();
                 }),
               ]),
-              Center(child: Text('T-BLOCK • 1.5.0', style: TextStyle(color: _palette.muted.withValues(alpha: .65), fontSize: 10, letterSpacing: 1))),
+              Center(child: Text('T-BLOCK • 1.6.0', style: TextStyle(color: _palette.muted.withValues(alpha: .65), fontSize: 10, letterSpacing: 1))),
             ])),
           ]),
         )),
@@ -542,37 +583,40 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       child: Center(child: SingleChildScrollView(child: Padding(padding: EdgeInsets.all(16), child: Column(mainAxisSize: MainAxisSize.min, children: [
         Icon(game.completed || game.over ? Icons.emoji_events_rounded : Icons.pause_circle_rounded, color: _palette.blocks[1], size: 34),
         SizedBox(height: 8),
-        Text(game.completed ? 'Stage complete!' : game.over ? (game.stage == null ? 'Nice run!' : 'Try again!') : 'Paused',
+        Text(game.completed ? (game.mode == PlayMode.sprint ? 'Sprint complete!' : game.mode == PlayMode.daily ? 'Challenge complete!' : 'Stage complete!') : game.over ? (game.mode == PlayMode.classic ? 'Nice run!' : 'Try again!') : 'Paused',
           textAlign: TextAlign.center, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
-        if (game.completed) ...[
+        if (game.completed && game.stage != null) ...[
           SizedBox(height: 6), Row(mainAxisAlignment: MainAxisAlignment.center, children: [
             for (var i = 0; i < 3; i++) Icon(i < game.earnedStars ? Icons.star_rounded : Icons.star_outline_rounded, color: _palette.blocks[1], size: 30),
           ]),
         ],
         if (game.over || game.completed) ...[
           SizedBox(height: 8), Text('Score ${game.score}  •  ${game.lines} lines', textAlign: TextAlign.center, style: TextStyle(fontSize: 13)),
+          if (game.mode == PlayMode.sprint) Text(formatRunTime(game.elapsedMilliseconds), style: TextStyle(color: _palette.accent, fontSize: 22, fontWeight: FontWeight.w800)),
           Text('${game.piecesLocked} blocks placed', style: TextStyle(color: _palette.muted, fontSize: 12)),
           SizedBox(height: 8),
           if (_settling) Text('Saving rewards…', style: TextStyle(color: _palette.muted, fontSize: 12)),
           if (_runReward != null) ...[
             Text('+${_runReward!.coins} Block Coins', textAlign: TextAlign.center, style: TextStyle(color: _palette.blocks[1], fontWeight: FontWeight.w800)),
+            for (final entry in _runReward!.details.entries) Text('${entry.key}: +${entry.value}', textAlign: TextAlign.center, style: TextStyle(color: _palette.muted, fontSize: 10)),
+            if (_runReward!.note != null) Text(_runReward!.note!, textAlign: TextAlign.center, style: TextStyle(color: _palette.accent, fontSize: 11)),
             for (final name in _runReward!.achievements) Text('Unlocked: $name', textAlign: TextAlign.center, style: TextStyle(color: _palette.accent, fontSize: 11)),
           ],
           if (_rewardError != null) ...[Text(_rewardError!, textAlign: TextAlign.center, style: TextStyle(fontSize: 12)),
             _button('Retry saving', Icons.save_rounded, _settleFinished, height: 48)],
         ],
         SizedBox(height: 16),
-        if (game.completed && game.stage!.id < 30 && progress.data.unlocked(journeyStages[game.stage!.id])) ...[
+        if (game.completed && game.stage != null && game.stage!.id < 30 && progress.data.unlocked(journeyStages[game.stage!.id])) ...[
           _button('Next stage', Icons.arrow_forward_rounded, _settling || _rewardError != null ? null : () =>
             _startNewGame(confirm: false, journeyStage: journeyStages[game.stage!.id]), primary: true, height: 50), SizedBox(height: 8),
         ],
         _button(game.paused ? 'Resume' : game.stage == null ? 'Play again' : 'Replay stage', Icons.play_arrow_rounded,
           _settling || _rewardError != null ? null : () {
             if (game.paused) { game.togglePause(); _scheduleTick(); }
-            else { _startNewGame(confirm: false, journeyStage: game.stage); }
+            else { _startNewGame(confirm: false, journeyStage: game.stage, playMode: game.mode, dailyDay: game.daily?.day); }
           }, primary: !game.completed, height: 50),
         if (game.paused) ...[SizedBox(height: 8), _button('Restart', Icons.replay_rounded,
-          () => _startNewGame(journeyStage: game.stage), height: 48)],
+          () => _startNewGame(journeyStage: game.stage, playMode: game.mode, dailyDay: game.daily?.day), height: 48)],
         if (game.stage != null && !game.paused) ...[SizedBox(height: 8), _button('Journey map', Icons.route_rounded,
           _settling || _rewardError != null ? null : () { _returnHome(); _openHub(); }, height: 48)],
         SizedBox(height: 8), _button('Home', Icons.home_rounded, _settling || _rewardError != null ? null : _returnHome, height: 48),
@@ -587,7 +631,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
         TBlockMark(size: 30, color: _palette.accent), SizedBox(width: 8),
         Expanded(child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('T-BLOCK', style: TextStyle(fontSize: 21, letterSpacing: 1.8, fontWeight: FontWeight.w900)),
-          Text(game.stage == null ? gameTagline : 'Stage ${game.stage!.id} · ${game.stage!.objective} · ${game.goalProgress}/${game.stage!.target}',
+          Text(game.mode == PlayMode.classic ? gameTagline : '${game.modeLabel} · ${game.objective}',
             maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: _palette.muted, fontSize: 9, letterSpacing: .2)),
         ])),
         ArcadeIconButton(tooltip: 'Settings', icon: Icons.tune_rounded, onPressed: _showSettings, palette: _palette),
@@ -597,7 +641,18 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       ])),
       SizedBox(height: 6),
       SizedBox(height: 52 * scale, child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        _stat('Score', '${game.score}'), SizedBox(width: 6), _stat('Level', '${game.level}'), SizedBox(width: 6), _stat(game.stage == null ? 'Best' : 'Goal', game.stage == null ? '$highScore' : '${game.goalProgress}/${game.stage!.target}'), SizedBox(width: 6),
+        if (game.mode == PlayMode.sprint) ...[
+          _stat('Lines', '${game.lines}/40'), SizedBox(width: 6),
+          Expanded(child: Container(padding: EdgeInsets.symmetric(horizontal: 4),
+            decoration: BoxDecoration(color: _palette.panel, borderRadius: BorderRadius.circular(14), border: Border.all(color: _palette.accent.withValues(alpha: .26))),
+            child: Center(child: FittedBox(fit: BoxFit.scaleDown, child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Text('TIME', style: TextStyle(color: _palette.muted, fontSize: 8, letterSpacing: 1.5)), SprintTimeText(game: game),
+            ]))))), SizedBox(width: 6),
+          _stat('Best', progress.data.sprintBestMs == 0 ? '—' : formatRunTime(progress.data.sprintBestMs)),
+        ] else ...[
+          _stat('Score', '${game.score}'), SizedBox(width: 6), _stat('Level', '${game.level}'), SizedBox(width: 6),
+          _stat(game.mode == PlayMode.classic ? 'Best' : 'Goal', game.mode == PlayMode.classic ? '$highScore' : '${game.goalProgress}/${game.goalTarget}'),
+        ], SizedBox(width: 6),
         Container(width: 52, padding: EdgeInsets.all(4), decoration: BoxDecoration(color: _palette.panel,
           borderRadius: BorderRadius.circular(14), border: Border.all(color: _palette.accent.withValues(alpha: .26))),
           child: Column(children: [Text('NEXT', style: TextStyle(color: _palette.muted, fontSize: 8, letterSpacing: 1.2)),
