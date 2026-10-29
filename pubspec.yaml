@@ -1,5 +1,5 @@
 name: zen_blocks
-description: T-BLOCK: a falling-block puzzle with Journey, rewards and collectible styles.
+description: "T-BLOCK: a falling-block puzzle with Journey, rewards and collectible styles."
 publish_to: none
 version: 1.5.0+8
 environment:

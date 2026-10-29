@@ -261,6 +261,7 @@ class ZenGame extends ChangeNotifier {
     if (!canMove) return;
     if (move(0, 1)) {
       score += 1;
+      if (stage?.goal == StageGoal.score && goalProgress >= stage!.target) { completed = true; active = null; }
       notifyListeners();
     } else {
       _lock();

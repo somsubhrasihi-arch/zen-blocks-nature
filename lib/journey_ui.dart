@@ -29,12 +29,13 @@ class _AdventureHubState extends State<AdventureHub> {
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
   Future<void> buy(ShopItem item) async {
+    if (busy) return;
+    setState(() => busy = true);
     final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
       title: Text('Unlock ${item.name}?'), content: Text('${item.price} Block Coins\nBalance after purchase: ${data.coins - item.price}'),
       actions: [Row(children: [Expanded(child: button('Cancel', Icons.close_rounded, () => Navigator.pop(context, false))),
         const SizedBox(width: 10), Expanded(child: button('Unlock', Icons.check_rounded, () => Navigator.pop(context, true)))])]));
-    if (confirmed != true || !mounted) return;
-    setState(() => busy = true);
+    if (confirmed != true || !mounted) { if (mounted) setState(() => busy = false); return; }
     try {
       final result = await widget.progress.buy(item.id);
       message(switch (result) { PurchaseResult.purchased => '${item.name} unlocked!',
