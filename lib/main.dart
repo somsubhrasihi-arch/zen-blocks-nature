@@ -410,10 +410,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: _palette.accent.withValues(alpha: .2))),
     focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: _palette.accent, width: 1.5)));
 
-  Widget _settingToggle(String label, IconData icon, bool value, ValueChanged<bool> change) => SwitchListTile(
+  Widget _settingToggle(String label, IconData icon, bool value, ValueChanged<bool> change) => Material(
+    color: Colors.transparent, borderRadius: BorderRadius.circular(12), child: SwitchListTile(
     contentPadding: EdgeInsets.zero, secondary: Icon(icon, color: _palette.muted, size: 22),
     title: Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-    value: value, onChanged: change, activeColor: _palette.accent);
+    value: value, onChanged: change, activeColor: _palette.accent));
 
   void _showSettings() => showModalBottomSheet<void>(context: context,
     useSafeArea: true, isScrollControlled: true, backgroundColor: Colors.transparent,

@@ -80,6 +80,24 @@ void main() {
     });
   }
 
+  testWidgets('larger text keeps the field and controls on screen', (tester) async {
+    tester.platformDispatcher.textScaleFactorTestValue = 1.5;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await mount(tester, const Size(393, 850));
+    await tester.tap(find.text('Start playing')); await tester.pump();
+    final frame = tester.getRect(find.byKey(const ValueKey('playing-field-frame')));
+    expect(frame.top, greaterThan(0));
+    expect(frame.bottom, lessThan(tester.getTopLeft(find.text('DROP')).dy));
+    expect(tester.getBottomRight(find.text('DROP')).dy, lessThan(850));
+    expect(tester.takeException(), isNull);
+    await capture(tester, '06-game-large-text');
+    await tester.tap(find.byTooltip('Settings'));
+    await tester.pump(); await tester.pump(const Duration(milliseconds: 350));
+    expect(tester.takeException(), isNull);
+    await capture(tester, '07-settings-large-text');
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('board border paints continuously on all four sides', (tester) async {
     await mount(tester, const Size(412, 900));
     await tester.tap(find.text('Start playing')); await tester.pump();
