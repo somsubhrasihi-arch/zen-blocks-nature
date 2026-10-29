@@ -51,7 +51,7 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(ZenBlocksApp(audio: GameAudio(backend: FakeAudioBackend())));
     await tester.pump(); await tester.pump();
-    expect(find.text('T-BLOCK AURORA'), findsOneWidget);
+    expect(find.text('T-BLOCK'), findsOneWidget);
     expect(find.byType(TBlockMark), findsOneWidget);
     expect(tester.widget<MaterialApp>(find.byType(MaterialApp)).title, appDisplayName);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -62,7 +62,7 @@ void main() {
     final backend = FakeAudioBackend();
     await tester.pumpWidget(ZenBlocksApp(audio: GameAudio(backend: backend)));
     await tester.pump(); await tester.pump();
-    expect(find.text('FOREST CALM'), findsOneWidget);
+    expect(find.text(gameTagline), findsOneWidget);
     await tester.tap(find.text('Start playing'));
     await tester.pump(); await tester.pump();
     final board = tester.widgetList<CustomPaint>(find.byType(CustomPaint)).map((w) => w.painter).whereType<BoardPainter>().single;

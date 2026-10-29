@@ -102,14 +102,14 @@ void main() {
     await tester.tap(find.byTooltip('Settings'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
-    await tester.ensureVisible(find.text('Spectacular effects'));
+    await tester.ensureVisible(find.text('Line-clear effects'));
     await tester.pump();
-    await tester.tap(find.text('Spectacular effects'));
+    await tester.tap(find.text('Line-clear effects'));
     await tester.pump();
     final stopped = aurora.value;
     await tester.pump(const Duration(milliseconds: 400));
     expect(aurora.value, stopped);
-    await tester.tap(find.text('Spectacular effects'));
+    await tester.tap(find.text('Line-clear effects'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     expect(aurora.value, isNot(stopped));

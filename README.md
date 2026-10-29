@@ -1,4 +1,4 @@
-# T-Block Aurora
+# T-BLOCK
 
 An original falling-block puzzle for Android, built with Flutter and a Neon Aurora visual theme.
 
@@ -103,4 +103,7 @@ The existing `.github/workflows/build-apk.yml` is preserved. A push to `main` or
 See [PLAY_STORE_RELEASE.md](PLAY_STORE_RELEASE.md) for the unsigned release-preview workflow, upload signing setup, and remaining store requirements.
 
 ## Branding and customization
-The Android display name is T-Block Aurora. The application ID, saved-game format, repository and legacy APK artifact name remain unchanged. Both build workflows apply branding through `tools/configure_branding.py`. Settings remember the theme and music selection; new installs retain Neon Aurora and Aurora Ambient by default.
+The Android display name is T-BLOCK. The application ID, saved-game format, repository and legacy APK artifact name remain unchanged. Both build workflows apply branding through `tools/configure_branding.py`. Settings remember the theme and music selection; new installs retain Neon Aurora and Aurora Ambient by default.
+
+## Version 1.4.0
+T-BLOCK uses the tagline “Stack. Clear. Repeat.”, responsive compact game chrome, an inset board frame, raised arcade controls, and grouped settings with styled dropdowns. Music, theme, saved-game data and package identity are retained.

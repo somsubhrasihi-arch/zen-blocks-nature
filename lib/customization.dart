@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
-const appDisplayName = 'T-Block Aurora';
+const appDisplayName = 'T-BLOCK';
+const gameTagline = 'Stack. Clear. Repeat.';
 
 class MusicTrack {
   const MusicTrack(this.id, this.name, this.bpm, this.mood, this.asset);
@@ -10,7 +11,7 @@ class MusicTrack {
 }
 
 const musicTracks = [
-  MusicTrack('aurora', 'Aurora Ambient', 60, 'Calm, spacious bells · original default', 'audio/aurora.mp3'),
+  MusicTrack('aurora', 'Aurora Ambient', 60, 'Calm, spacious bells', 'audio/aurora.mp3'),
   MusicTrack('forest', 'Forest Flow', 80, 'Warm, gentle arpeggios', 'audio/forest_flow.mp3'),
   MusicTrack('ocean', 'Ocean Pulse', 105, 'Flowing synths and a light rhythm', 'audio/ocean_pulse.mp3'),
   MusicTrack('rush', 'Neon Rush', 135, 'Bright, energetic arcade groove', 'audio/neon_rush.mp3'),

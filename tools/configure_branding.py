@@ -1,4 +1,4 @@
-"""Apply T-Block Aurora branding after Flutter generates Android scaffolding."""
+"""Apply T-BLOCK branding after Flutter generates Android scaffolding."""
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
@@ -11,7 +11,7 @@ tree = ET.parse(manifest)
 application = tree.getroot().find('application')
 if application is None:
     raise SystemExit('Android application manifest was not found.')
-application.set(f'{{{ANDROID_NS}}}label', 'T-Block Aurora')
+application.set(f'{{{ANDROID_NS}}}label', 'T-BLOCK')
 application.set(f'{{{ANDROID_NS}}}icon', '@mipmap/ic_launcher')
 tree.write(manifest, encoding='utf-8', xml_declaration=True)
 
@@ -43,4 +43,4 @@ write('drawable/t_block_monochrome.xml', vector(''.join(
 adaptive = f'<adaptive-icon xmlns:android="{ANDROID_NS}"><background android:drawable="@drawable/t_block_background"/><foreground android:drawable="@drawable/t_block_foreground"/>{{monochrome}}</adaptive-icon>'
 write('mipmap-anydpi-v26/ic_launcher.xml', adaptive.replace('{monochrome}', ''))
 write('mipmap-anydpi-v33/ic_launcher.xml', adaptive.replace('{monochrome}', '<monochrome android:drawable="@drawable/t_block_monochrome"/>'))
-print('Applied T-Block Aurora label, legacy/adaptive T-piece icons and Android themed icon.')
+print('Applied T-BLOCK label, legacy/adaptive T-piece icons and Android themed icon.')

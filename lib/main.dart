@@ -9,6 +9,7 @@ import 'game_audio.dart';
 import 'session_store.dart';
 import 'customization.dart';
 import 't_block_mark.dart';
+import 'arcade_ui.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,7 +34,7 @@ class ZenBlocksApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
         title: appDisplayName,
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(useMaterial3: true, brightness: Brightness.dark,
+        theme: ThemeData(useMaterial3: true, brightness: Brightness.dark, fontFamily: 'Roboto',
           scaffoldBackgroundColor: forest, colorSchemeSeed: const Color(0xFF9ECFC0)),
         home: GameScreen(audio: audio),
       );
@@ -61,7 +62,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   GamePalette _palette = neonPalette;
   String _musicTrack = 'aurora';
   ThemeData get _themeData => ThemeData(useMaterial3: true, brightness: Brightness.dark,
-    scaffoldBackgroundColor: _palette.background.first, colorSchemeSeed: _palette.accent);
+    scaffoldBackgroundColor: _palette.background.first, colorSchemeSeed: _palette.accent,
+    fontFamily: 'Roboto', sliderTheme: SliderThemeData(trackHeight: 5,
+      activeTrackColor: _palette.accent, inactiveTrackColor: _palette.accent.withValues(alpha: .16),
+      thumbColor: _palette.accent, thumbShape: RoundSliderThumbShape(enabledThumbRadius: 8),
+      overlayShape: RoundSliderOverlayShape(overlayRadius: 16)));
   double musicVolume = .28, effectsVolume = .8;
   int joystickRepeat = 120;
   final SessionStore sessions = SessionStore();
@@ -204,8 +209,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       final replace = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
         title: Text('Start a new game?'),
         content: Text('Your current saved game will be replaced. Your personal best is kept.'),
-        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text('New game'))],
+        actions: [Row(children: [Expanded(child: _button('Cancel', Icons.close_rounded, () => Navigator.pop(context, false), height: 48)),
+          SizedBox(width: 10), Expanded(child: _button('New game', Icons.bolt_rounded, () => Navigator.pop(context, true), primary: true, height: 48))])],
       ));
       if (replace != true || !mounted) return;
     }
@@ -239,64 +244,83 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     _syncAudio();
   }
 
+  Widget _button(String label, IconData icon, VoidCallback? action, {bool primary = false,
+    Color? accent, double height = 58, bool stacked = false}) => ArcadeButton(
+      label: label, icon: icon, onPressed: action, accent: accent ?? _palette.accent,
+      surface: _palette.control, primary: primary, height: height, stacked: stacked);
+
   Widget _volumeSlider(String label, double value, bool enabled, ValueChanged<double> onChanged) => Column(
-    children: [Text('$label · ${(value * 100).round()}%', style: TextStyle(color: _palette.muted)),
+    crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [Expanded(child: Text(label, style: TextStyle(color: cream, fontSize: 13, fontWeight: FontWeight.w600))),
+        Container(padding: EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+          decoration: BoxDecoration(color: _palette.accent.withValues(alpha: .12), borderRadius: BorderRadius.circular(8)),
+          child: Text('${(value * 100).round()}%', style: TextStyle(color: _palette.accent, fontSize: 11, fontWeight: FontWeight.w700)))]),
       Slider(semanticFormatterCallback: (v) => '${(v * 100).round()} percent',
-        value: value, divisions: 20, onChanged: enabled ? onChanged : null,
-        onChangeEnd: (_) => _saveSettings())],
+        value: value, onChanged: enabled ? onChanged : null, onChangeEnd: (_) => _saveSettings())],
   );
 
   void _showHowToPlay() => showModalBottomSheet<void>(context: context, showDragHandle: true,
-    isScrollControlled: true, backgroundColor: _palette.panel, builder: (context) => SafeArea(
+    useSafeArea: true, isScrollControlled: true, backgroundColor: _palette.panel,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+    builder: (context) => Theme(data: _themeData, child: SafeArea(
       child: SingleChildScrollView(child: Padding(padding: EdgeInsets.all(24), child: Column(
         mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Find your flow', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-          SizedBox(height: 16),
-          Text('Fill a complete horizontal row to clear it. Clear 10 rows to reach the next level.'),
-          SizedBox(height: 16),
-          Text('Joystick: hold left or right to move, pull down for a soft drop, push up once to rotate.'),
-          SizedBox(height: 12),
-          Text('Tap the board or ROTATE to turn a piece. DROP lands it immediately. The faint outline shows its landing position.'),
-          SizedBox(height: 12),
-          Text('Prefer buttons? Turn off Joystick controls in Settings. You can adjust joystick speed, music and effects volume there too.'),
-          SizedBox(height: 12),
-          Text('Your game saves automatically. Use Home to pause it, then Continue when you return.'),
-          SizedBox(height: 20),
-          FilledButton(onPressed: () => Navigator.pop(context), child: Text('Got it')),
+          Text('How to play', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
+          SizedBox(height: 18),
+          _helpRow(Icons.view_stream_rounded, 'Clear the rows', 'Fill a horizontal row. Every 10 rows unlocks the next level.'),
+          _helpRow(Icons.control_camera_rounded, 'Make your move', 'Hold the joystick left or right. Pull down to fall faster; push up to rotate.'),
+          _helpRow(Icons.rotate_right_rounded, 'Find the fit', 'Tap the board or Rotate. The faint outline shows where your piece will land.'),
+          _helpRow(Icons.keyboard_double_arrow_down_rounded, 'Drop it', 'Hit Drop to land your piece instantly.'),
+          SizedBox(height: 8),
+          SizedBox(width: double.infinity, child: _button('Got it', Icons.check_rounded, () => Navigator.pop(context), primary: true)),
         ]))),
-    ));
+    )));
+
+  Widget _helpRow(IconData icon, String title, String detail) => Padding(
+    padding: EdgeInsets.only(bottom: 18), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Icon(icon, color: _palette.accent, size: 26), SizedBox(width: 14),
+      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(title, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)), SizedBox(height: 4),
+        Text(detail, style: TextStyle(color: _palette.muted, fontSize: 13, height: 1.45)),
+      ])),
+    ]));
 
   Widget _buildHome() => Center(child: SingleChildScrollView(child: Padding(
     padding: EdgeInsets.all(24), child: ConstrainedBox(constraints: BoxConstraints(maxWidth: 420),
     child: Column(mainAxisSize: MainAxisSize.min, children: [
-      TBlockMark(size: 76, color: _palette.accent),
-      SizedBox(height: 16),
-      Text('T-BLOCK AURORA', textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 28, letterSpacing: 2, fontWeight: FontWeight.w800)),
-      Text(_palette.name.toUpperCase(), style: TextStyle(color: _palette.muted, letterSpacing: 4)),
-      SizedBox(height: 12),
-      Text('Find your flow, one block at a time.', style: TextStyle(color: _palette.muted)),
-      SizedBox(height: 28),
-      Text('PERSONAL BEST  $highScore', style: TextStyle(color: cream, fontSize: 18)),
+      TBlockMark(size: 82, color: _palette.accent), SizedBox(height: 16),
+      Text('T-BLOCK', textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 40, letterSpacing: 4, fontWeight: FontWeight.w900)),
+      SizedBox(height: 6),
+      Text(gameTagline, style: TextStyle(color: _palette.muted, fontSize: 13, letterSpacing: 1.8)),
+      SizedBox(height: 26),
+      Container(padding: EdgeInsets.symmetric(horizontal: 22, vertical: 12),
+        decoration: BoxDecoration(color: _palette.panel.withValues(alpha: .7), borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _palette.accent.withValues(alpha: .22))),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.emoji_events_rounded, color: _palette.blocks[1], size: 32), SizedBox(width: 14),
+          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('PERSONAL BEST', style: TextStyle(color: _palette.muted, fontSize: 9, letterSpacing: 1.6)),
+            Text('$highScore', style: TextStyle(color: cream, fontSize: 27, fontWeight: FontWeight.w800)),
+          ]),
+        ])),
       SizedBox(height: 24),
       if (_loading) Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator()),
       if (_savedState != null) ...[
-        Text('Saved game · Score ${_savedState!['score']} · Level ${_savedState!['level']}',
-          style: TextStyle(color: _palette.muted)),
+        Text('Score ${_savedState!['score']}  •  Level ${_savedState!['level']}', style: TextStyle(color: _palette.muted, fontSize: 13)),
+        SizedBox(height: 12),
+        SizedBox(width: double.infinity, child: _button('Continue', Icons.play_arrow_rounded, _loading ? null : _continueGame, primary: true, height: 62)),
         SizedBox(height: 10),
-        SizedBox(width: double.infinity, child: FilledButton.icon(
-          onPressed: _loading ? null : _continueGame, icon: Icon(Icons.play_arrow_rounded), label: Text('Continue'))),
       ],
-      SizedBox(width: double.infinity, child: OutlinedButton.icon(
-        onPressed: _loading ? null : _startNewGame, icon: Icon(Icons.add_rounded),
-        label: Text(_savedState == null ? 'Start playing' : 'Start new game'))),
-      SizedBox(height: 12),
-      Wrap(alignment: WrapAlignment.center, spacing: 12, children: [
-        TextButton.icon(onPressed: _showHowToPlay, icon: Icon(Icons.help_outline), label: Text('How to play')),
-        IconButton(tooltip: 'Settings', onPressed: _showSettings, icon: Icon(Icons.tune_rounded)),
+      SizedBox(width: double.infinity, child: _button(_savedState == null ? 'Start playing' : 'Start new game',
+        Icons.bolt_rounded, _loading ? null : _startNewGame, primary: _savedState == null,
+        accent: _savedState == null ? _palette.accent : _palette.blocks[2], height: 62)),
+      SizedBox(height: 14),
+      Row(children: [
+        Expanded(child: _button('How to play', Icons.sports_esports_rounded, _showHowToPlay, height: 50)),
+        SizedBox(width: 10), Expanded(child: Tooltip(message: 'Settings', child: _button('Settings', Icons.tune_rounded, _showSettings, height: 50))),
       ]),
-      SizedBox(height: 20),
-      Text('Offline play · Saved on this device · v1.3.0', style: TextStyle(color: _palette.muted, fontSize: 11)),
+      SizedBox(height: 22), Text('v1.4.0', style: TextStyle(color: _palette.muted.withValues(alpha: .65), fontSize: 10, letterSpacing: 1)),
     ])),
   )));
 
@@ -354,160 +378,198 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   }
 
   Widget _stat(String label, String value) => Expanded(child: Container(
-    padding: EdgeInsets.symmetric(vertical: 10, horizontal: 9),
-    decoration: BoxDecoration(gradient: LinearGradient(colors: _palette.stats), borderRadius: BorderRadius.circular(14), border: Border.all(color: _palette.accent.withValues(alpha: .4))),
-    child: Column(children: [Text(label.toUpperCase(), style: TextStyle(color: _palette.muted, fontSize: 10, letterSpacing: 1.4)),
-      SizedBox(height: 4), Text(value, style: TextStyle(color: cream, fontSize: 20, fontWeight: FontWeight.w700))]),
+    padding: EdgeInsets.symmetric(vertical: 5, horizontal: 8),
+    decoration: BoxDecoration(gradient: LinearGradient(colors: _palette.stats), borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: _palette.accent.withValues(alpha: .26))),
+    child: Center(child: FittedBox(fit: BoxFit.scaleDown, child: Column(mainAxisSize: MainAxisSize.min, children: [
+      Text(label.toUpperCase(), style: TextStyle(color: _palette.muted, fontSize: 8, letterSpacing: 1.5)),
+      SizedBox(height: 2), Text(value, style: TextStyle(color: cream, fontSize: 19, fontWeight: FontWeight.w800)),
+    ]))),
   ));
 
   Widget _control(IconData icon, String label, VoidCallback action) => Expanded(
-    child: Semantics(button: true, label: label, child: Padding(
-      padding: EdgeInsets.symmetric(horizontal: 3),
-      child: Material(color: _palette.control, borderRadius: BorderRadius.circular(16),
-        child: InkWell(borderRadius: BorderRadius.circular(16), onTap: () => _act(action),
-          child: SizedBox(height: 62, child: Column(mainAxisAlignment: MainAxisAlignment.center,
-            children: [Icon(icon, color: cream, size: 25), Text(label, style: TextStyle(fontSize: 10, color: _palette.muted))])))),
-    )),
-  );
+    child: _button(label, icon, game.canMove ? () => _act(action) : null, stacked: true, height: 64,
+      primary: label == 'DROP', accent: label == 'DROP' ? _palette.blocks[1]
+        : label == 'ROTATE' ? _palette.blocks[2] : _palette.accent));
 
-  void _showSettings() => showModalBottomSheet<void>(context: context, backgroundColor: _palette.panel,
-    showDragHandle: true, isScrollControlled: true, builder: (context) => StatefulBuilder(builder: (context, update) =>
-      Theme(data: _themeData, child: SafeArea(child: SingleChildScrollView(child: Padding(padding: EdgeInsets.all(20), child: Column(mainAxisSize: MainAxisSize.min,
-        children: [Text('Personalize your game', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-          SizedBox(height: 16),
-          DropdownButtonFormField<String>(key: ValueKey('theme-selector'), value: _palette.id, isExpanded: true,
-            decoration: InputDecoration(labelText: 'Visual theme', border: OutlineInputBorder()),
-            items: gamePalettes.map((theme) => DropdownMenuItem(value: theme.id, child: Row(children: [
-              Container(width: 18, height: 18, decoration: BoxDecoration(color: theme.accent, borderRadius: BorderRadius.circular(4))),
-              SizedBox(width: 10), Text(theme.name),
-            ]))).toList(),
-            onChanged: (id) { if (id == null) return; update(() => _palette = paletteForId(id)); setState(() {}); _saveSettings(); }),
-          SizedBox(height: 14),
-          DropdownButtonFormField<String>(key: ValueKey('music-selector'), value: _musicTrack, isExpanded: true,
-            decoration: InputDecoration(labelText: 'Music track', border: OutlineInputBorder()),
-            items: musicTracks.map((track) => DropdownMenuItem(value: track.id, child: Text(track.label,
-              overflow: TextOverflow.ellipsis))).toList(),
-            onChanged: (id) { if (id == null) return; update(() => _musicTrack = trackForId(id).id); setState(() {}); _syncAudio(); _saveSettings(); }),
-          Padding(padding: EdgeInsets.only(top: 8), child: Text(trackForId(_musicTrack).mood,
-            style: TextStyle(color: _palette.muted, fontSize: 12))),
-          Text('Music changes while playing; paused games stay silent.', style: TextStyle(color: _palette.muted, fontSize: 11)),
-          SwitchListTile(title: Text('Background music'), value: musicEnabled, onChanged: (v) {
-            update(() => musicEnabled = v); setState(() {}); _syncAudio(); _saveSettings();
-          }),
-          _volumeSlider('Music volume', musicVolume, musicEnabled, (v) {
-            update(() => musicVolume = v); setState(() {}); _syncAudio();
-          }),
-          SwitchListTile(title: Text('Game sound effects'), value: soundEnabled, onChanged: (v) {
-            update(() => soundEnabled = v); setState(() {}); _syncAudio(); _saveSettings();
-          }),
-          _volumeSlider('Effects volume', effectsVolume, soundEnabled, (v) {
-            update(() => effectsVolume = v); setState(() {}); _syncAudio();
-          }),
-          SwitchListTile(title: Text('Touch vibration'), value: vibrationEnabled, onChanged: (v) {
-            update(() => vibrationEnabled = v); setState(() {}); _saveSettings();
-          }),
-          SwitchListTile(title: Text('Joystick controls'), value: joystickEnabled, onChanged: (v) {
-            update(() => joystickEnabled = v); setState(() {}); _saveSettings();
-          }),
-          if (joystickEnabled) Column(children: [
-            Text('Joystick speed · ${(100 * (220 - joystickRepeat) / 140).round()}%'),
-            Slider(label: 'Joystick speed', value: (220 - joystickRepeat).toDouble(), min: 0, max: 140, divisions: 14,
-              onChanged: (v) { update(() => joystickRepeat = 220 - v.round()); setState(() {}); },
-              onChangeEnd: (_) => _saveSettings()),
+  Widget _settingsSection(String label, IconData icon, List<Widget> children) => Container(
+    margin: EdgeInsets.only(bottom: 14), padding: EdgeInsets.all(14),
+    decoration: BoxDecoration(color: _palette.control.withValues(alpha: .55), borderRadius: BorderRadius.circular(22),
+      border: Border.all(color: _palette.accent.withValues(alpha: .15))),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Row(children: [Icon(icon, color: _palette.accent, size: 19), SizedBox(width: 9),
+        Text(label.toUpperCase(), style: TextStyle(color: _palette.muted, fontSize: 10, letterSpacing: 1.6, fontWeight: FontWeight.w700))]),
+      SizedBox(height: 12), ...children,
+    ]));
+
+  InputDecoration _choiceDecoration(String label, IconData icon) => InputDecoration(
+    labelText: label, labelStyle: TextStyle(color: _palette.muted, fontSize: 12),
+    prefixIcon: Icon(icon, color: _palette.accent, size: 21),
+    filled: true, fillColor: _palette.panel, contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: _palette.accent.withValues(alpha: .2))),
+    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: _palette.accent, width: 1.5)));
+
+  Widget _settingToggle(String label, IconData icon, bool value, ValueChanged<bool> change) => SwitchListTile(
+    contentPadding: EdgeInsets.zero, secondary: Icon(icon, color: _palette.muted, size: 22),
+    title: Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+    value: value, onChanged: change, activeColor: _palette.accent);
+
+  void _showSettings() => showModalBottomSheet<void>(context: context,
+    useSafeArea: true, isScrollControlled: true, backgroundColor: Colors.transparent,
+    builder: (context) => StatefulBuilder(builder: (context, update) => Theme(data: _themeData,
+      child: DraggableScrollableSheet(expand: false, initialChildSize: .9, minChildSize: .55, maxChildSize: .96,
+        builder: (context, scroll) => Container(
+          decoration: BoxDecoration(color: _palette.panel, borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            border: Border.all(color: _palette.accent.withValues(alpha: .22))),
+          child: Column(children: [
+            Padding(padding: EdgeInsets.fromLTRB(20, 10, 14, 12), child: Column(children: [
+              Container(width: 36, height: 4, decoration: BoxDecoration(color: _palette.muted.withValues(alpha: .4), borderRadius: BorderRadius.circular(4))),
+              SizedBox(height: 12),
+              Row(children: [TBlockMark(size: 30, color: _palette.accent), SizedBox(width: 10),
+                Expanded(child: Text('Settings', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800))),
+                ArcadeIconButton(tooltip: 'Done', icon: Icons.check_rounded, onPressed: () => Navigator.pop(context), palette: _palette),
+              ]),
+            ])),
+            Expanded(child: ListView(controller: scroll, padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + MediaQuery.paddingOf(context).bottom), children: [
+              _settingsSection('Appearance', Icons.palette_outlined, [
+                DropdownButtonFormField<String>(key: ValueKey('theme-selector'), value: _palette.id, isExpanded: true,
+                  dropdownColor: _palette.control, borderRadius: BorderRadius.circular(18),
+                  icon: Icon(Icons.expand_more_rounded, color: _palette.accent),
+                  style: TextStyle(color: cream, fontFamily: 'Roboto', fontSize: 14, fontWeight: FontWeight.w600),
+                  decoration: _choiceDecoration('Theme', Icons.auto_awesome_rounded),
+                  items: gamePalettes.map((theme) => DropdownMenuItem(value: theme.id, child: Row(children: [
+                    Expanded(child: Text(theme.name, overflow: TextOverflow.ellipsis)), SizedBox(width: 8),
+                    ...[theme.blocks[0], theme.blocks[2], theme.blocks[3]].map((color) => Container(
+                      margin: EdgeInsets.only(left: 3), width: 10, height: 14,
+                      decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3)))),
+                  ]))).toList(),
+                  onChanged: (id) { if (id == null) return; update(() => _palette = paletteForId(id)); setState(() {}); _saveSettings(); }),
+                SizedBox(height: 6),
+                _settingToggle('Line-clear effects', Icons.auto_awesome_rounded, effectsEnabled, (v) => update(() => _setEffectsEnabled(v))),
+              ]),
+              _settingsSection('Audio', Icons.graphic_eq_rounded, [
+                DropdownButtonFormField<String>(key: ValueKey('music-selector'), value: _musicTrack, isExpanded: true,
+                  dropdownColor: _palette.control, borderRadius: BorderRadius.circular(18),
+                  icon: Icon(Icons.expand_more_rounded, color: _palette.accent),
+                  style: TextStyle(color: cream, fontFamily: 'Roboto', fontSize: 14, fontWeight: FontWeight.w600),
+                  decoration: _choiceDecoration('Soundtrack', Icons.music_note_rounded),
+                  items: musicTracks.map((track) => DropdownMenuItem(value: track.id, child: Row(children: [
+                    Expanded(child: Text(track.name, overflow: TextOverflow.ellipsis)), SizedBox(width: 8),
+                    Container(padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                      decoration: BoxDecoration(color: _palette.accent.withValues(alpha: .12), borderRadius: BorderRadius.circular(7)),
+                      child: Text('${track.bpm} BPM', style: TextStyle(color: _palette.accent, fontSize: 9, fontWeight: FontWeight.w700))),
+                  ]))).toList(),
+                  onChanged: (id) { if (id == null) return; update(() => _musicTrack = trackForId(id).id); setState(() {}); _syncAudio(); _saveSettings(); }),
+                SizedBox(height: 8),
+                _settingToggle('Music', Icons.headphones_rounded, musicEnabled, (v) {
+                  update(() => musicEnabled = v); setState(() {}); _syncAudio(); _saveSettings();
+                }),
+                _volumeSlider('Music volume', musicVolume, musicEnabled, (v) { update(() => musicVolume = v); setState(() {}); _syncAudio(); }),
+                _settingToggle('Sound effects', Icons.volume_up_rounded, soundEnabled, (v) {
+                  update(() => soundEnabled = v); setState(() {}); _syncAudio(); _saveSettings();
+                }),
+                _volumeSlider('Effects volume', effectsVolume, soundEnabled, (v) { update(() => effectsVolume = v); setState(() {}); _syncAudio(); }),
+              ]),
+              _settingsSection('Controls', Icons.sports_esports_rounded, [
+                _settingToggle('Joystick', Icons.control_camera_rounded, joystickEnabled, (v) {
+                  update(() => joystickEnabled = v); setState(() {}); _saveSettings();
+                }),
+                if (joystickEnabled) _volumeSlider('Joystick speed', (220 - joystickRepeat) / 140, true, (v) {
+                  update(() => joystickRepeat = 220 - (v*140).round()); setState(() {});
+                }),
+                _settingToggle('Vibration', Icons.vibration_rounded, vibrationEnabled, (v) {
+                  update(() => vibrationEnabled = v); setState(() {}); _saveSettings();
+                }),
+              ]),
+              Center(child: Text('T-BLOCK • 1.4.0', style: TextStyle(color: _palette.muted.withValues(alpha: .65), fontSize: 10, letterSpacing: 1))),
+            ])),
           ]),
-          SwitchListTile(title: Text('Spectacular effects'), value: effectsEnabled, onChanged: (v) {
-            update(() => _setEffectsEnabled(v));
-          }),
-          Text('T-Block Aurora · 1.3.0', style: TextStyle(color: _palette.muted, fontSize: 12)),
-          Padding(padding: EdgeInsets.all(12), child: Text('Original ambient music and game sounds are bundled for offline play. Music pauses when the game is paused or the app is in the background.',
-            textAlign: TextAlign.center, style: TextStyle(color: _palette.muted, fontSize: 12))),
-        ])))))));
+        )),
+    )));
+
+  Widget _boardContents() => Stack(children: [
+    RepaintBoundary(child: CustomPaint(painter: BoardPainter(game.visibleBoard, ghost: game.ghostPiece, palette: _palette), size: Size.infinite)),
+    if (burstVisible && effectsEnabled && game.canMove) Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: SparkPainter(burst, palette: _palette))))),
+    if (game.paused || game.over) Positioned.fill(child: ColoredBox(color: _palette.overlay,
+      child: Center(child: SingleChildScrollView(child: Padding(padding: EdgeInsets.all(16), child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Icon(game.over ? Icons.emoji_events_rounded : Icons.pause_circle_rounded, color: _palette.blocks[1], size: 34),
+        SizedBox(height: 8),
+        Text(game.over ? 'Nice run!' : 'Paused', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+        if (game.over) ...[
+          SizedBox(height: 8), Text('Score ${game.score}  •  Best $highScore', style: TextStyle(fontSize: 13)),
+          Text('${game.lines} lines  •  Level ${game.level}', style: TextStyle(color: _palette.muted, fontSize: 12)),
+        ],
+        SizedBox(height: 16),
+        _button(game.over ? 'Play again' : 'Resume', Icons.play_arrow_rounded, () {
+          if (game.paused) { game.togglePause(); _scheduleTick(); } else { _startNewGame(confirm: false); }
+        }, primary: true, height: 50),
+        if (game.paused) ...[SizedBox(height: 8), _button('Restart', Icons.replay_rounded, _startNewGame, height: 48)],
+        SizedBox(height: 8), _button('Home', Icons.home_rounded, _returnHome, height: 48),
+      ])))),
+    )),
+  ]);
+
+  Widget _buildGame() => LayoutBuilder(builder: (context, constraints) {
+    final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.5).toDouble();
+    return Padding(padding: EdgeInsets.all(8), child: Column(children: [
+      SizedBox(height: 46 * scale, child: Row(children: [
+        TBlockMark(size: 30, color: _palette.accent), SizedBox(width: 8),
+        Expanded(child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('T-BLOCK', style: TextStyle(fontSize: 21, letterSpacing: 1.8, fontWeight: FontWeight.w900)),
+          Text(gameTagline, style: TextStyle(color: _palette.muted, fontSize: 9, letterSpacing: .5)),
+        ])),
+        ArcadeIconButton(tooltip: 'Settings', icon: Icons.tune_rounded, onPressed: _showSettings, palette: _palette),
+        SizedBox(width: 8),
+        ArcadeIconButton(tooltip: game.paused ? 'Resume' : 'Pause', icon: game.paused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+          onPressed: () { final resume = game.paused; game.togglePause(); if (resume) _scheduleTick(); }, palette: _palette),
+      ])),
+      SizedBox(height: 6),
+      SizedBox(height: 52 * scale, child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        _stat('Score', '${game.score}'), SizedBox(width: 6), _stat('Level', '${game.level}'), SizedBox(width: 6), _stat('Best', '$highScore'), SizedBox(width: 6),
+        Container(width: 52, padding: EdgeInsets.all(4), decoration: BoxDecoration(color: _palette.panel,
+          borderRadius: BorderRadius.circular(14), border: Border.all(color: _palette.accent.withValues(alpha: .26))),
+          child: Column(children: [Text('NEXT', style: TextStyle(color: _palette.muted, fontSize: 8, letterSpacing: 1.2)),
+            Expanded(child: CustomPaint(painter: NextPainter(game.nextKind, palette: _palette), size: Size.infinite)),
+          ])),
+      ])),
+      SizedBox(height: 6),
+      Expanded(child: LayoutBuilder(builder: (context, boardSpace) {
+        final width = math.min(boardSpace.maxWidth - 12, (boardSpace.maxHeight - 6) / 2).clamp(40.0, 1000.0).toDouble();
+        return Center(child: Padding(padding: EdgeInsets.all(6), child: SizedBox(width: width,
+          child: GameBoardFrame(palette: _palette, child: AspectRatio(aspectRatio: boardWidth / boardHeight, child: _boardContents())))));
+      })),
+      SizedBox(height: 6),
+      SizedBox(height: joystickEnabled ? 108 : 64, child: Row(children: [
+        if (joystickEnabled) ...[
+          GameJoystick(size: 104, accent: _palette.accent, surface: _palette.control, muted: _palette.muted,
+            enabled: game.canMove, repeatMilliseconds: joystickRepeat, onLeft: () => game.move(-1, 0),
+            onRight: () => game.move(1, 0), onDown: game.softDrop, onRotate: _rotate),
+          SizedBox(width: 12),
+        ] else ...[
+          _control(Icons.arrow_back_rounded, 'LEFT', () => game.move(-1, 0)), SizedBox(width: 6),
+        ],
+        _control(Icons.rotate_right_rounded, 'ROTATE', _rotate), SizedBox(width: 6),
+        if (!joystickEnabled) ...[
+          _control(Icons.arrow_forward_rounded, 'RIGHT', () => game.move(1, 0)), SizedBox(width: 6),
+          _control(Icons.arrow_downward_rounded, 'DOWN', game.softDrop), SizedBox(width: 6),
+        ],
+        _control(Icons.keyboard_double_arrow_down_rounded, 'DROP', game.hardDrop),
+      ])),
+    ]));
+  });
 
   @override
-  Widget build(BuildContext context) {
-    final next = game.nextKind;
-    return Theme(data: _themeData, child: PopScope(canPop: _home, onPopInvokedWithResult: (didPop, result) {
-      if (!didPop) _returnHome();
-    }, child: Scaffold(body: Container(
+  Widget build(BuildContext context) => Theme(data: _themeData, child: PopScope(canPop: _home,
+    onPopInvokedWithResult: (didPop, result) { if (!didPop) _returnHome(); },
+    child: Scaffold(body: Container(
       decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: _palette.background)),
-      child: Stack(children: [Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: AuroraPainter(aurora, game.level, effectsEnabled, palette: _palette))))),
-      SafeArea(child: _home ? _buildHome() : LayoutBuilder(builder: (context, constraints) {
-      final available = constraints.maxHeight;
-      final boardHeightPx = (available - (joystickEnabled ? 290 : 230)).clamp(200.0, 900.0);
-      return SingleChildScrollView(child: Padding(padding: EdgeInsets.fromLTRB(10, 8, 10, 8),
-        child: Column(children: [
-          Row(children: [TBlockMark(size: 32, color: _palette.accent),
-            SizedBox(width: 8), Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start,
-              children: [Text('T-BLOCK', style: TextStyle(color: cream, fontSize: 22, fontWeight: FontWeight.w800, letterSpacing: 2)),
-                Text(_palette.name.toUpperCase(), style: TextStyle(color: _palette.muted, fontSize: 10, letterSpacing: 2))])),
-            IconButton(tooltip: 'Settings', onPressed: _showSettings, icon: Icon(Icons.tune_rounded, color: cream)),
-            IconButton(tooltip: game.paused ? 'Resume' : 'Pause', onPressed: game.togglePause,
-              icon: Icon(game.paused ? Icons.play_arrow_rounded : Icons.pause_rounded, color: cream))]),
-          SizedBox(height: 14),
-          Row(children: [_stat('Score', '${game.score}'), SizedBox(width: 8),
-            _stat('Level', '${game.level}'), SizedBox(width: 8), _stat('Best', '$highScore'),
-            SizedBox(width: 8), SizedBox(width: 62, child: Column(children: [
-              Text('NEXT', style: TextStyle(color: _palette.muted, fontSize: 10, letterSpacing: 1.5)),
-              SizedBox(height: 44, width: 62, child: CustomPaint(painter: NextPainter(next, palette: _palette))),
-            ]))]),
-          SizedBox(height: 12),
-          Center(child: GestureDetector(
-              onHorizontalDragEnd: (details) {
-                if ((details.primaryVelocity ?? 0) > 0) _act(() => game.move(1, 0));
-                if ((details.primaryVelocity ?? 0) < 0) _act(() => game.move(-1, 0));
-              },
-              onVerticalDragEnd: (details) {
-                if ((details.primaryVelocity ?? 0) > 0) _act(game.hardDrop);
-              },
-              onTap: () => _act(_rotate),
-              child: SizedBox(width: boardHeightPx / 2, child: AspectRatio(aspectRatio: boardWidth / boardHeight,
-                child: Container(constraints: BoxConstraints(maxHeight: boardHeightPx),
-                  decoration: BoxDecoration(color: _palette.board, borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: _palette.accent, width: 2)),
-                  clipBehavior: Clip.antiAlias, child: Stack(children: [
-                    RepaintBoundary(child: CustomPaint(painter: BoardPainter(game.visibleBoard, ghost: game.ghostPiece, palette: _palette), size: Size.infinite)),
-                    if (burstVisible && effectsEnabled && game.canMove) Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: SparkPainter(burst, palette: _palette))))),
-                    if (!game.started || game.paused || game.over)
-                      Container(color: _palette.overlay, alignment: Alignment.center,
-                        child: Column(mainAxisSize: MainAxisSize.min, children: [
-                          Icon(game.over ? Icons.emoji_events_outlined : Icons.pause_circle_outline, color: _palette.muted, size: 36),
-                          SizedBox(height: 8),
-                          Text(game.over ? 'Aurora fades' : 'Paused',
-                            style: TextStyle(color: cream, fontSize: 20, fontWeight: FontWeight.bold)),
-                          if (game.over) ...[
-                            SizedBox(height: 8),
-                            Text('Score ${game.score}  ·  Best $highScore', style: TextStyle(color: cream)),
-                            Text('${game.lines} lines  ·  Level ${game.level}', style: TextStyle(color: _palette.muted)),
-                          ],
-                          SizedBox(height: 10),
-                          ElevatedButton(onPressed: () {
-                            if (game.paused) { game.togglePause(); _scheduleTick(); }
-                            else { _startNewGame(confirm: false); }
-                          }, child: Text(game.over ? 'Play again' : 'Resume')),
-                          if (game.paused) TextButton(onPressed: _startNewGame, child: Text('Restart')),
-                          TextButton(onPressed: _returnHome, child: Text('Home')),
-                        ])),
-                  ])))),
-            )),
-          SizedBox(height: 14),
-          if (joystickEnabled) Row(children: [
-            GameJoystick(enabled: game.canMove, repeatMilliseconds: joystickRepeat,
-              onLeft: () => game.move(-1, 0),
-              onRight: () => game.move(1, 0),
-              onDown: game.softDrop, onRotate: _rotate),
-            SizedBox(width: 12),
-            _control(Icons.rotate_right_rounded, 'ROTATE', _rotate),
-            _control(Icons.keyboard_double_arrow_down_rounded, 'DROP', game.hardDrop),
-          ]) else Row(children: [
-            _control(Icons.arrow_back_rounded, 'LEFT', () => game.move(-1, 0)),
-            _control(Icons.rotate_right_rounded, 'ROTATE', _rotate),
-            _control(Icons.arrow_forward_rounded, 'RIGHT', () => game.move(1, 0)),
-            _control(Icons.arrow_downward_rounded, 'DOWN', game.softDrop),
-            _control(Icons.keyboard_double_arrow_down_rounded, 'DROP', game.hardDrop),
-          ]),
-        ])));
-    })) ])))));
-  }
+      child: Stack(children: [
+        Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: AuroraPainter(aurora, game.level, effectsEnabled, palette: _palette))))),
+        SafeArea(child: _home ? _buildHome() : _buildGame()),
+      ]),
+    )),
+  ));
 }
 
 class BoardPainter extends CustomPainter {
