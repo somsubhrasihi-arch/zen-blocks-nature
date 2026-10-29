@@ -57,12 +57,12 @@ class _ArcadeButtonState extends State<ArcadeButton> {
                   border: Border.all(color: Colors.white.withValues(alpha: .42), width: 1.5)),
                 child: widget.label.isEmpty ? Center(child: icon) : widget.stacked
                   ? Column(mainAxisAlignment: MainAxisAlignment.center, children: [icon, const SizedBox(height: 3), Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: label))])
-                  : Row(mainAxisAlignment: MainAxisAlignment.center, children: [icon, const SizedBox(width: 9), Flexible(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                    FittedBox(fit: BoxFit.scaleDown, child: label),
-                    if (widget.subtitle != null) ...[const SizedBox(height: 2), FittedBox(fit: BoxFit.scaleDown, child: Text(widget.subtitle!, maxLines: 1,
+                  : Row(mainAxisAlignment: MainAxisAlignment.center, children: [icon, const SizedBox(width: 9), Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    label,
+                    if (widget.subtitle != null) ...[const SizedBox(height: 2), Text(widget.subtitle!, maxLines: 1,
                       style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w500,
-                        shadows: [Shadow(color: Color(0xAA08182B), offset: Offset(0, 1), blurRadius: 2)])))],
-                  ]))]),
+                        shadows: [Shadow(color: Color(0xAA08182B), offset: Offset(0, 1), blurRadius: 2)]))],
+                  ])))]),
               )),
             ),
           ),

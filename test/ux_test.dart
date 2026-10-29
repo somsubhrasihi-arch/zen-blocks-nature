@@ -81,7 +81,7 @@ void main() {
     expect(find.text('Jelly Gems'),findsWidgets);expect(store.data.coins,0);expect(store.data.skin,'glass');
     await capture(tester,'18-cosmetic-preview');
     await tester.tap(find.text('Close preview'));await tester.pump();await tester.pump(const Duration(milliseconds:500));
-    await tester.ensureVisible(find.text('Owned'));await tester.tap(find.text('Owned'));await tester.pump();
+    await tester.scrollUntilVisible(find.text('Owned'), -250, scrollable: find.byType(Scrollable).first);await tester.tap(find.text('Owned'));await tester.pump();
     expect(find.text('Pixel Pop'),findsNothing);expect(find.text('Neon Glass'),findsOneWidget);
     await tester.tap(find.text('Affordable'));await tester.pump();expect(find.text('A little more play, a new look'),findsOneWidget);
     expect(tester.takeException(),isNull);await tester.pumpWidget(const SizedBox.shrink());store.dispose();

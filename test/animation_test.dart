@@ -112,6 +112,11 @@ void main() {
     await tester.tap(find.text('Line-clear effects'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
+    expect(aurora.value, stopped);
+    await tester.tap(find.byTooltip('Done'));
+    await tester.pump(); await tester.pump(const Duration(milliseconds: 400));
+    await tester.tap(find.text('Resume'));
+    await tester.pump(); await tester.pump(const Duration(milliseconds: 100));
     expect(aurora.value, isNot(stopped));
     await tester.pumpWidget(const SizedBox.shrink());
   });

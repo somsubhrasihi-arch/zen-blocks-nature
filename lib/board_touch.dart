@@ -12,10 +12,22 @@ class BoardTouchControls extends StatefulWidget {
   State<BoardTouchControls> createState() => _BoardTouchControlsState();
 }
 class _BoardTouchControlsState extends State<BoardTouchControls> {
-  Offset travel = Offset.zero;
+  Offset travel = Offset.zero, origin = Offset.zero;
   double horizontal = 0;
   int axis = 0;
   void reset() { travel = Offset.zero; horizontal = 0; axis = 0; }
+  void update(Offset position, double step) {
+    final next = position - origin;
+    if (axis == 0 && next.distance > 10) axis = next.dx.abs() > next.dy.abs() ? 1 : 2;
+    if (axis == 1) {
+      horizontal += next.dx - travel.dx;
+      while (horizontal.abs() >= step) {
+        final direction = horizontal > 0 ? 1 : -1;
+        widget.onMove(direction); horizontal -= direction * step;
+      }
+    }
+    travel = next;
+  }
   @override
   void didUpdateWidget(covariant BoardTouchControls oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -27,22 +39,13 @@ class _BoardTouchControlsState extends State<BoardTouchControls> {
     return Semantics(label: 'Playing field', hint: 'Tap to rotate. Drag left or right to move. Swipe down to drop.',
       child: GestureDetector(behavior: HitTestBehavior.opaque,
         onTap: widget.enabled ? widget.onRotate : null,
-        onPanStart: widget.enabled ? (_) => reset() : null,
-        onPanUpdate: widget.enabled ? (d) {
-          travel += d.delta;
-          if (axis == 0 && travel.distance > 10) axis = travel.dx.abs() > travel.dy.abs() ? 1 : 2;
-          if (axis == 1) {
-            horizontal += d.delta.dx;
-            while (horizontal.abs() >= step) {
-              final direction = horizontal > 0 ? 1 : -1;
-              widget.onMove(direction); horizontal -= direction * step;
-            }
-          }
-        } : null,
+        onPanDown: widget.enabled ? (d) { reset(); origin = d.localPosition; } : null,
+        onPanStart: widget.enabled ? (d) => update(d.localPosition, step) : null,
+        onPanUpdate: widget.enabled ? (d) => update(d.localPosition, step) : null,
         onPanEnd: widget.enabled ? (_) {
           if (axis == 2 && travel.dy >= step * 2 && travel.dy > travel.dx.abs() * 1.3) widget.onDrop();
           reset();
         } : null,
-        onPanCancel: reset, child: widget.child));
+        onPanCancel: widget.enabled ? reset : null, child: widget.child));
   });
 }
