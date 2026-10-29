@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'campaign.dart';
 
 const int boardWidth = 10;
 const int boardHeight = 20;
@@ -30,6 +31,15 @@ class ZenGame extends ChangeNotifier {
   late List<List<int>> board;
   Piece? active;
   int? nextKind;
+  JourneyStage? stage;
+  String runId = '';
+  bool completed = false;
+  Set<int> obstacleRows = {};
+  int get obstaclesCleared => (stage?.obstacleCount ?? 0) - obstacleRows.length;
+  int get goalProgress => switch (stage?.goal) {
+    StageGoal.lines => lines, StageGoal.score => score, StageGoal.excavation => obstaclesCleared, _ => 0,
+  };
+  int get earnedStars => completed ? stage!.starsFor(piecesLocked) : 0;
   int score = 0;
   int piecesLocked = 0;
   int lines = 0;
@@ -51,6 +61,7 @@ class ZenGame extends ChangeNotifier {
 
   void reset() {
     board = List.generate(boardHeight, (_) => List.filled(boardWidth, 0));
+    stage = null; completed = false; obstacleRows = {}; runId = '';
     score = 0;
     piecesLocked = 0;
     lines = 0;
@@ -65,25 +76,36 @@ class ZenGame extends ChangeNotifier {
     notifyListeners();
   }
 
-  void start() {
-    if (started && !over) return;
+  void start({JourneyStage? journeyStage}) {
+    if (started && !over && !completed) return;
     reset();
+    stage = journeyStage;
+    runId = '${DateTime.now().microsecondsSinceEpoch}-${_random.nextInt(1 << 30)}';
+    level = stage?.startLevel ?? 1;
+    if (stage != null) {
+      for (var row = 0; row < stage!.obstacleCount; row++) {
+        final y = boardHeight - 1 - row;
+        final hole = (row * 3 + stage!.id) % (boardWidth - 1);
+        board[y] = List.generate(boardWidth, (x) => x == hole || x == hole + 1 ? 0 : (row % 7) + 1);
+        obstacleRows.add(y);
+      }
+    }
     started = true;
     _spawn();
     notifyListeners();
   }
 
   void togglePause() {
-    if (!started || over) return;
+    if (!started || over || completed) return;
     paused = !paused;
     notifyListeners();
   }
 
-  bool get canMove => started && !over && !paused && active != null;
+  bool get canMove => started && !over && !completed && !paused && active != null;
 
   Piece? get ghostPiece {
     final piece = active;
-    if (!started || over || piece == null) return null;
+    if (!started || over || completed || piece == null) return null;
     var landingY = piece.y;
     while (_fits(piece.cells, piece.x, landingY + 1)) { landingY++; }
     return Piece(piece.kind, piece.cells, piece.x, landingY);
@@ -91,9 +113,9 @@ class ZenGame extends ChangeNotifier {
 
   Map<String, dynamic>? saveState() {
     final piece = active;
-    if (!started || over || piece == null) return null;
+    if (!started || over || completed || piece == null) return null;
     return {
-      'version': 1,
+      'version': 1, 'stageId': stage?.id, 'runId': runId, 'obstacleRows': obstacleRows.toList(),
       'board': board.map((row) => List<int>.from(row)).toList(),
       'piece': {'kind': piece.kind, 'x': piece.x, 'y': piece.y,
         'cells': piece.cells.map((row) => List<int>.from(row)).toList()},
@@ -110,6 +132,15 @@ class ZenGame extends ChangeNotifier {
       if (value is! Map || value['version'] != 1) return false;
       List<List<int>> matrix(Object? source) => (source as List)
           .map((row) => (row as List).cast<int>().toList()).toList();
+      final stageId = value['stageId'];
+      if (stageId != null && (stageId is! int || stageForId(stageId) == null)) return false;
+      final savedStage = stageForId(stageId as int?);
+      final obstacleSource = value['obstacleRows'] ?? <int>[];
+      if (obstacleSource is! List || obstacleSource.any((v) => v is! int || v < 0 || v >= boardHeight)) return false;
+      final savedObstacles = obstacleSource.cast<int>().toSet();
+      if (savedObstacles.length > (savedStage?.obstacleCount ?? 0)) return false;
+      final savedRunId = value['runId'];
+      if (savedRunId != null && (savedRunId is! String || savedRunId.length > 100 || savedRunId.isEmpty)) return false;
       final savedBoard = matrix(value['board']);
       if (savedBoard.length != boardHeight || savedBoard.any((row) =>
           row.length != boardWidth || row.any((cell) => cell < 0 || cell > 7))) return false;
@@ -146,8 +177,16 @@ class ZenGame extends ChangeNotifier {
       final savedLevel = value['level'] as int;
       final savedCombo = value['combo'] as int;
       final locks = value['piecesLocked'] as int;
-      if (savedScore < 0 || savedLines < 0 || savedLevel != 1 + savedLines ~/ 10 ||
+      if (savedScore < 0 || savedLines < 0 || savedLevel != (savedStage?.startLevel ?? 1) + savedLines ~/ 10 ||
           savedCombo < -1 || locks < 0) return false;
+      final progress = switch (savedStage?.goal) {
+        StageGoal.lines => savedLines, StageGoal.score => savedScore,
+        StageGoal.excavation => savedStage!.obstacleCount - savedObstacles.length, _ => 0,
+      };
+      if (savedStage != null && progress >= savedStage.target) return false;
+      if (savedObstacles.any((r) => savedBoard[r].every((v) => v == 0))) return false;
+      stage = savedStage; obstacleRows = savedObstacles; completed = false;
+      runId = savedRunId as String? ?? '${DateTime.now().microsecondsSinceEpoch}-${_random.nextInt(1 << 30)}';
       board = savedBoard;
       active = Piece(kind, cells, x, y);
       nextKind = next;
@@ -262,7 +301,9 @@ class ZenGame extends ChangeNotifier {
       final base = [0, 100, 300, 500, 800][cleared];
       score += base * level + combo * 50 * level;
       lines += cleared;
-      level = 1 + lines ~/ 10;
+      level = (stage?.startLevel ?? 1) + lines ~/ 10;
+      final fullRows = <int>{for (var y = 0; y < boardHeight; y++) if (board[y].every((v) => v != 0)) y};
+      obstacleRows = {for (final y in obstacleRows) if (!fullRows.contains(y)) y + fullRows.where((r) => r > y).length};
       board = [
         ...List.generate(cleared, (_) => List.filled(boardWidth, 0)),
         ...remaining,
@@ -270,7 +311,11 @@ class ZenGame extends ChangeNotifier {
     } else {
       combo = -1;
     }
-    _spawn();
+    if (stage != null && goalProgress >= stage!.target) {
+      completed = true; active = null;
+    } else {
+      _spawn();
+    }
     notifyListeners();
   }
 

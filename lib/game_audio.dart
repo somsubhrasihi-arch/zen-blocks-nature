@@ -133,7 +133,7 @@ class GameAudio {
     musicVolume = musicVolume.clamp(0.0, 1.0).toDouble();
     effectsVolume = effectsVolume.clamp(0.0, 1.0).toDouble();
     final cues = _tracker.update(game);
-    final active = foreground && game.started && !game.paused && !game.over;
+    final active = foreground && game.started && !game.paused && !game.over && !game.completed;
     final playing = active && musicEnabled && musicVolume > 0;
     final effects = active && effectsEnabled && effectsVolume > 0;
     final musicChanged = playing != _playing;

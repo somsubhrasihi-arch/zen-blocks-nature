@@ -10,6 +10,10 @@ import 'session_store.dart';
 import 'customization.dart';
 import 't_block_mark.dart';
 import 'arcade_ui.dart';
+import 'campaign.dart';
+import 'progress_store.dart';
+import 'journey_ui.dart';
+import 'cosmetic_paint.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -70,6 +74,31 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   double musicVolume = .28, effectsVolume = .8;
   int joystickRepeat = 120;
   final SessionStore sessions = SessionStore();
+  final ProgressStore progress = ProgressStore();
+  RunReward? _runReward;
+  String? _settlingRun, _rewardError;
+  bool _settling = false;
+
+  void _progressChanged() { if (mounted) setState(() {}); }
+  void _openHub([int tab = 0]) {
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => Theme(data: _themeData,
+      child: AdventureHub(palette: _palette, progress: progress, initialTab: tab,
+        onStage: (stage) => _startNewGame(journeyStage: stage)))));
+  }
+  Future<void> _settleFinished() async {
+    if ((!game.over && !game.completed) || _settlingRun == game.runId) return;
+    final id = game.runId;
+    _settlingRun = id; _settling = true; _rewardError = null;
+    try {
+      final reward = await progress.settle(runId: id, lines: game.lines, pieces: game.piecesLocked,
+        stageId: game.stage?.id, completed: game.completed, stars: game.earnedStars);
+      if (mounted && game.runId == id) setState(() { _runReward = reward; _settling = false; });
+    } catch (_) {
+      if (mounted && game.runId == id) setState(() {
+        _settlingRun = null; _settling = false; _rewardError = 'Your reward could not be saved.';
+      });
+    }
+  }
   Map<String, dynamic>? _savedState;
   bool _home = true, _loading = true;
   Timer? _saveDebounce;
@@ -92,6 +121,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       });
     WidgetsBinding.instance.addObserver(this);
     game.addListener(_onGameChanged);
+    progress.addListener(_progressChanged);
     _loadSettings();
     _scheduleTick();
   }
@@ -99,6 +129,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     final saved = await sessions.load();
+    await progress.load();
     if (!mounted) return;
     setState(() {
       highScore = prefs.getInt('highScore') ?? 0;
@@ -144,22 +175,23 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       }
       if (vibrationEnabled) HapticFeedback.heavyImpact();
     }
-    if (!game.started || game.over) {
+    if (!game.started || game.over || game.completed) {
       _hideBurst();
       burst.reset();
     }
     lastLines = game.lines;
     _syncAnimations();
-    if (game.score > highScore) {
+    if (game.stage == null && game.score > highScore) {
       highScore = game.score;
       SharedPreferences.getInstance().then((p) => p.setInt('highScore', highScore));
     }
     _syncAudio();
     if (game.over && !_wasOver && vibrationEnabled) HapticFeedback.mediumImpact();
     _wasOver = game.over;
+    if (game.over || game.completed) unawaited(_settleFinished());
     if (!_loading) {
       _saveDebounce?.cancel();
-      if (!game.started || game.over || game.paused || game.piecesLocked != _lastLocks) {
+      if (!game.started || game.over || game.completed || game.paused || game.piecesLocked != _lastLocks) {
         unawaited(_persistNow());
       } else {
         _saveDebounce = Timer(Duration(milliseconds: 150), () => unawaited(_persistNow()));
@@ -203,8 +235,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     return sessions.save(_savedState);
   }
 
-  Future<void> _startNewGame({bool confirm = true}) async {
-    if (_loading) return;
+  Future<void> _startNewGame({bool confirm = true, JourneyStage? journeyStage}) async {
+    if (_loading || _settling || _rewardError != null) return;
+    if (journeyStage != null && !progress.data.unlocked(journeyStage)) return;
     if (confirm && (game.saveState() != null || _savedState != null)) {
       final replace = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
         title: Text('Start a new game?'),
@@ -216,8 +249,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     }
     _saveDebounce?.cancel();
     game.reset();
+    _runReward = null; _settlingRun = null; _rewardError = null;
     setState(() { _home = false; _savedState = null; });
-    game.start();
+    game.start(journeyStage: journeyStage);
     _scheduleTick();
     _syncAudio();
     unawaited(_persistNow());
@@ -238,6 +272,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   }
 
   void _returnHome() {
+    if (_settling || _rewardError != null) return;
     if (game.started && !game.over && !game.paused) game.togglePause();
     unawaited(_persistNow());
     setState(() => _home = true);
@@ -267,7 +302,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
         mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('How to play', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
           SizedBox(height: 18),
-          _helpRow(Icons.view_stream_rounded, 'Clear the rows', 'Fill a horizontal row. Every 10 rows unlocks the next level.'),
+          _helpRow(Icons.view_stream_rounded, 'Clear the rows', 'Fill a horizontal row. Every 10 rows increases the speed.'),
+          _helpRow(Icons.route_rounded, 'Take the Journey', 'Complete stage objectives. Use fewer blocks to earn up to three stars and unlock new worlds.'),
+          _helpRow(Icons.shopping_bag_rounded, 'Make it yours', 'Finish runs for Block Coins. Spend them on skins and clear effects in the Shop. Rewards save on this device.'),
           _helpRow(Icons.control_camera_rounded, 'Make your move', 'Hold the joystick left or right. Pull down to fall faster; push up to rotate.'),
           _helpRow(Icons.rotate_right_rounded, 'Find the fit', 'Tap the board or Rotate. The faint outline shows where your piece will land.'),
           _helpRow(Icons.keyboard_double_arrow_down_rounded, 'Drop it', 'Hit Drop to land your piece instantly.'),
@@ -288,12 +325,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   Widget _buildHome() => Center(child: SingleChildScrollView(child: Padding(
     padding: EdgeInsets.all(24), child: ConstrainedBox(constraints: BoxConstraints(maxWidth: 420),
     child: Column(mainAxisSize: MainAxisSize.min, children: [
-      TBlockMark(size: 82, color: _palette.accent), SizedBox(height: 16),
+      TBlockMark(size: 60, color: _palette.accent), SizedBox(height: 16),
       Text('T-BLOCK', textAlign: TextAlign.center,
         style: TextStyle(fontSize: 40, letterSpacing: 4, fontWeight: FontWeight.w900)),
       SizedBox(height: 6),
       Text(gameTagline, style: TextStyle(color: _palette.muted, fontSize: 13, letterSpacing: 1.8)),
-      SizedBox(height: 26),
+      SizedBox(height: 18),
       Container(padding: EdgeInsets.symmetric(horizontal: 22, vertical: 12),
         decoration: BoxDecoration(color: _palette.panel.withValues(alpha: .7), borderRadius: BorderRadius.circular(20),
           border: Border.all(color: _palette.accent.withValues(alpha: .22))),
@@ -307,7 +344,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       SizedBox(height: 24),
       if (_loading) Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator()),
       if (_savedState != null) ...[
-        Text('Score ${_savedState!['score']}  •  Level ${_savedState!['level']}', style: TextStyle(color: _palette.muted, fontSize: 13)),
+        Text('${_savedState!['stageId'] == null ? 'Classic' : 'Journey · Stage ${_savedState!["stageId"]}'}  •  Score ${_savedState!["score"]}', style: TextStyle(color: _palette.muted, fontSize: 13)),
         SizedBox(height: 12),
         SizedBox(width: double.infinity, child: _button('Continue', Icons.play_arrow_rounded, _loading ? null : _continueGame, primary: true, height: 62)),
         SizedBox(height: 10),
@@ -315,12 +352,19 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       SizedBox(width: double.infinity, child: _button(_savedState == null ? 'Start playing' : 'Start new game',
         Icons.bolt_rounded, _loading ? null : _startNewGame, primary: _savedState == null,
         accent: _savedState == null ? _palette.accent : _palette.blocks[2], height: 62)),
+      SizedBox(height: 12),
+      SizedBox(width: double.infinity, child: _button('Journey · ${progress.data.stars.length}/30', Icons.route_rounded,
+        _loading ? null : () => _openHub(), accent: _palette.blocks[2], height: 58)),
+      SizedBox(height: 10),
+      Row(children: [Expanded(child: _button('Shop · ${progress.data.coins}', Icons.shopping_bag_rounded,
+          _loading ? null : () => _openHub(1), accent: _palette.blocks[1], height: 50)),
+        SizedBox(width: 10), Expanded(child: _button('Achievements', Icons.emoji_events_rounded, _loading ? null : () => _openHub(2), height: 50))]),
       SizedBox(height: 14),
       Row(children: [
         Expanded(child: _button('How to play', Icons.sports_esports_rounded, _showHowToPlay, height: 50)),
         SizedBox(width: 10), Expanded(child: Tooltip(message: 'Settings', child: _button('Settings', Icons.tune_rounded, _showSettings, height: 50))),
       ]),
-      SizedBox(height: 22), Text('v1.4.1', style: TextStyle(color: _palette.muted.withValues(alpha: .65), fontSize: 10, letterSpacing: 1)),
+      SizedBox(height: 22), Text('v1.5.0', style: TextStyle(color: _palette.muted.withValues(alpha: .65), fontSize: 10, letterSpacing: 1)),
     ])),
   )));
 
@@ -371,6 +415,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     unawaited(_persistNow());
     aurora.dispose();
     burst.dispose();
+    progress.removeListener(_progressChanged);
+    progress.dispose();
     game.removeListener(_onGameChanged);
     game.dispose();
     unawaited(audio.dispose());
@@ -483,30 +529,53 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
                   update(() => vibrationEnabled = v); setState(() {}); _saveSettings();
                 }),
               ]),
-              Center(child: Text('T-BLOCK • 1.4.1', style: TextStyle(color: _palette.muted.withValues(alpha: .65), fontSize: 10, letterSpacing: 1))),
+              Center(child: Text('T-BLOCK • 1.5.0', style: TextStyle(color: _palette.muted.withValues(alpha: .65), fontSize: 10, letterSpacing: 1))),
             ])),
           ]),
         )),
     )));
 
   Widget _boardContents() => Stack(children: [
-    RepaintBoundary(child: CustomPaint(painter: BoardPainter(game.visibleBoard, ghost: game.ghostPiece, palette: _palette), size: Size.infinite)),
-    if (burstVisible && effectsEnabled && game.canMove) Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: SparkPainter(burst, palette: _palette))))),
-    if (game.paused || game.over) Positioned.fill(child: ColoredBox(color: _palette.overlay,
+    RepaintBoundary(child: CustomPaint(painter: BoardPainter(game.visibleBoard, ghost: game.ghostPiece, palette: _palette, skin: progress.data.skin, markedRows: game.obstacleRows), size: Size.infinite)),
+    if (burstVisible && effectsEnabled && game.canMove) Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: SparkPainter(burst, palette: _palette, effect: progress.data.effect))))),
+    if (game.paused || game.over || game.completed) Positioned.fill(child: ColoredBox(color: _palette.overlay,
       child: Center(child: SingleChildScrollView(child: Padding(padding: EdgeInsets.all(16), child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Icon(game.over ? Icons.emoji_events_rounded : Icons.pause_circle_rounded, color: _palette.blocks[1], size: 34),
+        Icon(game.completed || game.over ? Icons.emoji_events_rounded : Icons.pause_circle_rounded, color: _palette.blocks[1], size: 34),
         SizedBox(height: 8),
-        Text(game.over ? 'Nice run!' : 'Paused', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
-        if (game.over) ...[
-          SizedBox(height: 8), Text('Score ${game.score}  •  Best $highScore', style: TextStyle(fontSize: 13)),
-          Text('${game.lines} lines  •  Level ${game.level}', style: TextStyle(color: _palette.muted, fontSize: 12)),
+        Text(game.completed ? 'Stage complete!' : game.over ? (game.stage == null ? 'Nice run!' : 'Try again!') : 'Paused',
+          textAlign: TextAlign.center, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+        if (game.completed) ...[
+          SizedBox(height: 6), Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            for (var i = 0; i < 3; i++) Icon(i < game.earnedStars ? Icons.star_rounded : Icons.star_outline_rounded, color: _palette.blocks[1], size: 30),
+          ]),
+        ],
+        if (game.over || game.completed) ...[
+          SizedBox(height: 8), Text('Score ${game.score}  •  ${game.lines} lines', textAlign: TextAlign.center, style: TextStyle(fontSize: 13)),
+          Text('${game.piecesLocked} blocks placed', style: TextStyle(color: _palette.muted, fontSize: 12)),
+          SizedBox(height: 8),
+          if (_settling) Text('Saving rewards…', style: TextStyle(color: _palette.muted, fontSize: 12)),
+          if (_runReward != null) ...[
+            Text('+${_runReward!.coins} Block Coins', textAlign: TextAlign.center, style: TextStyle(color: _palette.blocks[1], fontWeight: FontWeight.w800)),
+            for (final name in _runReward!.achievements) Text('Unlocked: $name', textAlign: TextAlign.center, style: TextStyle(color: _palette.accent, fontSize: 11)),
+          ],
+          if (_rewardError != null) ...[Text(_rewardError!, textAlign: TextAlign.center, style: TextStyle(fontSize: 12)),
+            _button('Retry saving', Icons.save_rounded, _settleFinished, height: 48)],
         ],
         SizedBox(height: 16),
-        _button(game.over ? 'Play again' : 'Resume', Icons.play_arrow_rounded, () {
-          if (game.paused) { game.togglePause(); _scheduleTick(); } else { _startNewGame(confirm: false); }
-        }, primary: true, height: 50),
-        if (game.paused) ...[SizedBox(height: 8), _button('Restart', Icons.replay_rounded, _startNewGame, height: 48)],
-        SizedBox(height: 8), _button('Home', Icons.home_rounded, _returnHome, height: 48),
+        if (game.completed && game.stage!.id < 30 && progress.data.unlocked(journeyStages[game.stage!.id])) ...[
+          _button('Next stage', Icons.arrow_forward_rounded, _settling || _rewardError != null ? null : () =>
+            _startNewGame(confirm: false, journeyStage: journeyStages[game.stage!.id]), primary: true, height: 50), SizedBox(height: 8),
+        ],
+        _button(game.paused ? 'Resume' : game.stage == null ? 'Play again' : 'Replay stage', Icons.play_arrow_rounded,
+          _settling || _rewardError != null ? null : () {
+            if (game.paused) { game.togglePause(); _scheduleTick(); }
+            else { _startNewGame(confirm: false, journeyStage: game.stage); }
+          }, primary: !game.completed, height: 50),
+        if (game.paused) ...[SizedBox(height: 8), _button('Restart', Icons.replay_rounded,
+          () => _startNewGame(journeyStage: game.stage), height: 48)],
+        if (game.stage != null && !game.paused) ...[SizedBox(height: 8), _button('Journey map', Icons.route_rounded,
+          _settling || _rewardError != null ? null : () { _returnHome(); _openHub(); }, height: 48)],
+        SizedBox(height: 8), _button('Home', Icons.home_rounded, _settling || _rewardError != null ? null : _returnHome, height: 48),
       ])))),
     )),
   ]);
@@ -518,7 +587,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
         TBlockMark(size: 30, color: _palette.accent), SizedBox(width: 8),
         Expanded(child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('T-BLOCK', style: TextStyle(fontSize: 21, letterSpacing: 1.8, fontWeight: FontWeight.w900)),
-          Text(gameTagline, style: TextStyle(color: _palette.muted, fontSize: 9, letterSpacing: .5)),
+          Text(game.stage == null ? gameTagline : 'Stage ${game.stage!.id} · ${game.stage!.objective} · ${game.goalProgress}/${game.stage!.target}',
+            maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: _palette.muted, fontSize: 9, letterSpacing: .2)),
         ])),
         ArcadeIconButton(tooltip: 'Settings', icon: Icons.tune_rounded, onPressed: _showSettings, palette: _palette),
         SizedBox(width: 8),
@@ -527,11 +597,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       ])),
       SizedBox(height: 6),
       SizedBox(height: 52 * scale, child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        _stat('Score', '${game.score}'), SizedBox(width: 6), _stat('Level', '${game.level}'), SizedBox(width: 6), _stat('Best', '$highScore'), SizedBox(width: 6),
+        _stat('Score', '${game.score}'), SizedBox(width: 6), _stat('Level', '${game.level}'), SizedBox(width: 6), _stat(game.stage == null ? 'Best' : 'Goal', game.stage == null ? '$highScore' : '${game.goalProgress}/${game.stage!.target}'), SizedBox(width: 6),
         Container(width: 52, padding: EdgeInsets.all(4), decoration: BoxDecoration(color: _palette.panel,
           borderRadius: BorderRadius.circular(14), border: Border.all(color: _palette.accent.withValues(alpha: .26))),
           child: Column(children: [Text('NEXT', style: TextStyle(color: _palette.muted, fontSize: 8, letterSpacing: 1.2)),
-            Expanded(child: CustomPaint(painter: NextPainter(game.nextKind, palette: _palette), size: Size.infinite)),
+            Expanded(child: CustomPaint(painter: NextPainter(game.nextKind, palette: _palette, skin: progress.data.skin), size: Size.infinite)),
           ])),
       ])),
       SizedBox(height: 6),
@@ -574,7 +644,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
 }
 
 class BoardPainter extends CustomPainter {
-  BoardPainter(this.cells, {this.ghost, this.palette = neonPalette});
+  BoardPainter(this.cells, {this.ghost, this.palette = neonPalette, this.skin = 'glass', this.markedRows = const {}});
+  final String skin;
+  final Set<int> markedRows;
   final GamePalette palette;
   final List<List<int>> cells;
   final Piece? ghost;
@@ -601,7 +673,10 @@ class BoardPainter extends CustomPainter {
         final rect = Rect.fromLTWH(x * w, y * h, w, h);
         canvas.drawRect(rect, grid);
         final v = cells[y][x];
-        if (v > 0) drawBlock(canvas, rect.deflate(1), palette.blocks[v - 1]);
+        if (v > 0) drawBlock(canvas, rect.deflate(1), palette.blocks[v - 1], skin: skin);
+        if (markedRows.contains(y) && x == 0) {
+          canvas.drawCircle(Offset(rect.left + 4, rect.center.dy), 2, Paint()..color = Colors.white);
+        }
       }
     }
   }
@@ -609,15 +684,7 @@ class BoardPainter extends CustomPainter {
   bool shouldRepaint(covariant BoardPainter oldDelegate) => true;
 }
 
-void drawBlock(Canvas canvas, Rect rect, Color color) {
-  final r = RRect.fromRectAndRadius(rect.deflate(1), const Radius.circular(4));
-  canvas.drawRRect(r, Paint()..color = color.withValues(alpha: .55)..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6));
-  canvas.drawRRect(r, Paint()..shader = LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
-    colors: [Color.lerp(color, Colors.white, .42)!, color, Color.lerp(color, Colors.black, .32)!]).createShader(rect));
-  canvas.drawRRect(r, Paint()..color = Colors.white.withValues(alpha: .78)..style = PaintingStyle.stroke..strokeWidth = 1.2);
-  canvas.drawLine(Offset(rect.left + 4, rect.top + 4), Offset(rect.right - 5, rect.top + 4),
-    Paint()..color = Colors.white.withValues(alpha: .52)..strokeWidth = 1.6);
-}
+void drawBlock(Canvas canvas, Rect rect, Color color, {String skin = 'glass'}) => paintCosmeticBlock(canvas, rect, color, skin: skin);
 
 class AuroraPainter extends CustomPainter {
   AuroraPainter(this.animation, this.level, this.enabled, {this.palette = neonPalette}) : super(repaint: animation);
@@ -668,13 +735,29 @@ class AuroraPainter extends CustomPainter {
 }
 
 class SparkPainter extends CustomPainter {
-  SparkPainter(this.animation, {this.palette = neonPalette}) : super(repaint: animation);
+  SparkPainter(this.animation, {this.palette = neonPalette, this.effect = 'sparks'}) : super(repaint: animation);
   final GamePalette palette;
   final Animation<double> animation;
+  final String effect;
   @override
   void paint(Canvas canvas, Size size) {
     final progress = animation.value;
     if (progress <= 0 || progress >= 1) return;
+    if (effect == 'nova') {
+      for (var i = 0; i < 3; i++) {
+        canvas.drawCircle(Offset(size.width / 2, size.height * .65), (progress * size.width * .5 + i * 10),
+          Paint()..color = palette.blocks[i].withValues(alpha: (1-progress) * .8)..style = PaintingStyle.stroke..strokeWidth = 3*(1-progress)+1);
+      }
+    }
+    if (effect == 'lightning') {
+      for (var i = 0; i < 5; i++) {
+        final x = size.width * (i + 1) / 6;
+        final y = size.height * .65;
+        final path = Path()..moveTo(x + 12, y - progress * 75)..lineTo(x - 7, y)..lineTo(x + 7, y)..lineTo(x - 12, y + progress * 75);
+        canvas.drawPath(path, Paint()..color = palette.blocks[i].withValues(alpha: 1-progress)..style = PaintingStyle.stroke..strokeWidth = 3..strokeCap = StrokeCap.round);
+      }
+      return;
+    }
     for (var i = 0; i < 24; i++) {
       final a = i * math.pi * 2 / 24;
       final distance = 15 + progress * size.width * .48;
@@ -684,11 +767,12 @@ class SparkPainter extends CustomPainter {
     }
   }
   @override
-  bool shouldRepaint(covariant SparkPainter old) => old.animation != animation || old.palette != palette;
+  bool shouldRepaint(covariant SparkPainter old) => old.animation != animation || old.palette != palette || old.effect != effect;
 }
 
 class NextPainter extends CustomPainter {
-  NextPainter(this.kind, {this.palette = neonPalette});
+  NextPainter(this.kind, {this.palette = neonPalette, this.skin = 'glass'});
+  final String skin;
   final GamePalette palette;
   final int? kind;
   @override
@@ -701,10 +785,10 @@ class NextPainter extends CustomPainter {
     for (var r = 0; r < shape.length; r++) {
       for (var c = 0; c < shape[r].length; c++) {
         if (shape[r][c] == 1) drawBlock(canvas,
-          Rect.fromLTWH(startX + c * unit, startY + r * unit, unit - 1, unit - 1), palette.blocks[kind!]);
+          Rect.fromLTWH(startX + c * unit, startY + r * unit, unit - 1, unit - 1), palette.blocks[kind!], skin: skin);
       }
     }
   }
   @override
-  bool shouldRepaint(covariant NextPainter oldDelegate) => oldDelegate.kind != kind || oldDelegate.palette != palette;
+  bool shouldRepaint(covariant NextPainter oldDelegate) => oldDelegate.kind != kind || oldDelegate.palette != palette || oldDelegate.skin != skin;
 }
