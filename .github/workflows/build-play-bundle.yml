@@ -15,7 +15,7 @@ jobs:
       contents: read
     env:
       SIGN_RELEASE: ${{ inputs.sign_release && 'true' || 'false' }}
-      ZEN_UPLOAD_KEYSTORE_PATH: ${{ runner.temp }}/zen-upload.jks
+      ZEN_UPLOAD_KEYSTORE_PATH: /tmp/zen-upload.jks
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
