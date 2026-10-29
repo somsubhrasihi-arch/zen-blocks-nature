@@ -320,7 +320,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
         Expanded(child: _button('How to play', Icons.sports_esports_rounded, _showHowToPlay, height: 50)),
         SizedBox(width: 10), Expanded(child: Tooltip(message: 'Settings', child: _button('Settings', Icons.tune_rounded, _showSettings, height: 50))),
       ]),
-      SizedBox(height: 22), Text('v1.4.0', style: TextStyle(color: _palette.muted.withValues(alpha: .65), fontSize: 10, letterSpacing: 1)),
+      SizedBox(height: 22), Text('v1.4.1', style: TextStyle(color: _palette.muted.withValues(alpha: .65), fontSize: 10, letterSpacing: 1)),
     ])),
   )));
 
@@ -483,7 +483,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
                   update(() => vibrationEnabled = v); setState(() {}); _saveSettings();
                 }),
               ]),
-              Center(child: Text('T-BLOCK • 1.4.0', style: TextStyle(color: _palette.muted.withValues(alpha: .65), fontSize: 10, letterSpacing: 1))),
+              Center(child: Text('T-BLOCK • 1.4.1', style: TextStyle(color: _palette.muted.withValues(alpha: .65), fontSize: 10, letterSpacing: 1))),
             ])),
           ]),
         )),

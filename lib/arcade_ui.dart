@@ -23,45 +23,70 @@ class _ArcadeButtonState extends State<ArcadeButton> {
   Widget build(BuildContext context) {
     final enabled = widget.onPressed != null;
     final duration = MediaQuery.disableAnimationsOf(context) ? Duration.zero : const Duration(milliseconds: 100);
-    final ink = widget.primary ? const Color(0xFF09182B) : const Color(0xFFF6F5FF);
-    final icon = Icon(widget.icon, color: ink, size: widget.stacked ? 28 : 24);
+    const ink = Color(0xFFFFFFFF);
+    final base = Color.lerp(widget.accent, widget.surface, widget.primary ? .08 : .24)!;
+    final radius = BorderRadius.circular(widget.label.isEmpty ? 16 : 20);
+    final icon = Icon(widget.icon, color: ink, size: widget.stacked ? 28 : 24,
+      shadows: const [Shadow(color: Color(0x9908182B), offset: Offset(0, 2), blurRadius: 2)]);
     final label = Text(widget.label, maxLines: 1, overflow: TextOverflow.ellipsis,
       style: TextStyle(color: ink, fontSize: widget.stacked ? 10 : 15,
-        fontWeight: FontWeight.w800, letterSpacing: widget.stacked ? 1.2 : .2));
+        shadows: const [Shadow(color: Color(0xCC08182B), offset: Offset(0, 2), blurRadius: 2)],
+        fontWeight: FontWeight.w900, letterSpacing: widget.stacked ? 1.2 : .2));
     return Semantics(button: true, enabled: enabled, label: widget.semanticLabel,
       child: Opacity(opacity: enabled ? 1 : .4, child: AnimatedScale(
         duration: duration, scale: _pressed ? .965 : 1,
         child: Padding(padding: const EdgeInsets.only(bottom: 5), child: AnimatedContainer(
           duration: duration,
           transform: Matrix4.translationValues(0, _pressed ? 3 : 0, 0),
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(18), boxShadow: [
-            BoxShadow(color: Color.lerp(widget.accent, Colors.black, .65)!, offset: Offset(0, _pressed ? 1 : 5)),
+          decoration: BoxDecoration(borderRadius: radius, boxShadow: [
+            BoxShadow(color: Color.lerp(base, Colors.black, .58)!, offset: Offset(0, _pressed ? 1 : 5), blurRadius: 1),
             BoxShadow(color: widget.accent.withValues(alpha: enabled ? .14 : 0), blurRadius: 14, spreadRadius: -3),
           ]),
-          child: Material(color: Colors.transparent, borderRadius: BorderRadius.circular(18),
-            child: InkWell(borderRadius: BorderRadius.circular(18), onTap: widget.onPressed,
+          child: Material(color: Colors.transparent, borderRadius: radius,
+            child: InkWell(borderRadius: radius, onTap: widget.onPressed,
               onTapDown: enabled ? (_) => setState(() => _pressed = true) : null,
               onTapUp: (_) => setState(() => _pressed = false),
               onTapCancel: () => setState(() => _pressed = false),
-              splashColor: widget.accent.withValues(alpha: .2),
-              child: Ink(height: widget.height - 5,
+              splashColor: Colors.white.withValues(alpha: .24),
+              child: CustomPaint(foregroundPainter: const _ButtonShine(), child: Ink(height: widget.height - 5,
                 padding: EdgeInsets.symmetric(horizontal: widget.label.isEmpty ? 0 : widget.stacked ? 6 : 12, vertical: 5),
-                decoration: BoxDecoration(borderRadius: BorderRadius.circular(18),
-                  gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
-                    colors: widget.primary
-                      ? [Color.lerp(widget.accent, Colors.white, .32)!, widget.accent]
-                      : [Color.lerp(widget.surface, widget.accent, .2)!, widget.surface]),
-                  border: Border.all(color: widget.accent.withValues(alpha: widget.primary ? .9 : .5), width: 1.2)),
+                decoration: BoxDecoration(borderRadius: radius,
+                  gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter,
+                    stops: const [0, .45, 1],
+                    colors: [Color.lerp(base, Colors.white, .32)!, base, Color.lerp(base, Colors.black, .23)!]),
+                  border: Border.all(color: Colors.white.withValues(alpha: .42), width: 1.5)),
                 child: widget.label.isEmpty ? Center(child: icon) : widget.stacked
                   ? Column(mainAxisAlignment: MainAxisAlignment.center, children: [icon, const SizedBox(height: 3), Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: label))])
                   : Row(mainAxisAlignment: MainAxisAlignment.center, children: [icon, const SizedBox(width: 9), Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: label))]),
-              ),
+              )),
             ),
           ),
         )),
       )),
     );
   }
+}
+
+/// Small specular reflections and an inset rim give the buttons a soft toy finish.
+class _ButtonShine extends CustomPainter {
+  const _ButtonShine();
+  @override
+  void paint(Canvas canvas, Size size) {
+    final r = RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(20));
+    canvas.save();
+    canvas.clipRRect(r);
+    final rim = RRect.fromRectAndRadius(Rect.fromLTWH(3, 3, size.width - 6, size.height - 7), const Radius.circular(17));
+    canvas.drawRRect(rim, Paint()..style = PaintingStyle.stroke..strokeWidth = 1.5
+      ..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter,
+        colors: [Color(0x88FFFFFF), Color(0x00FFFFFF), Color(0x44FFFFFF)],
+        stops: [0, .5, 1]).createShader(Offset.zero & size));
+    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(9, 5, (size.width * .32).clamp(8, 54).toDouble(), 4), const Radius.circular(3)),
+      Paint()..color = Colors.white.withValues(alpha: .38));
+    canvas.drawOval(Rect.fromLTWH(size.width - 13, 7, 5, 8), Paint()..color = Colors.white.withValues(alpha: .48));
+    canvas.restore();
+  }
+  @override
+  bool shouldRepaint(covariant _ButtonShine oldDelegate) => false;
 }
 
 class ArcadeIconButton extends StatelessWidget {
