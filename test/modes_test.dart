@@ -186,6 +186,26 @@ void main() {
     await tester.tap(find.text('New game'));await tester.pump();await tester.pump(const Duration(milliseconds:500));
     expect(state.game.mode,PlayMode.daily);expect(state.game.daily.day,utcDay(DateTime.now()));
     await capture(tester,'15-daily-game');expect(tester.takeException(),isNull);
+    final g=state.game as ZenGame;
+    if(g.objectiveGoal==StageGoal.score) { g.score=g.goalTarget-1;g.softDrop(); }
+    else { while(!g.completed) { clearOne(g); } }
+    await tester.pump();await tester.pump();await tester.pump();
+    expect(find.text('Challenge complete!'),findsOneWidget);
+    expect(state.progress.data.dailyWins,1);
+    await capture(tester,'16-daily-complete');
+    await tester.ensureVisible(find.text('Home'));await tester.tap(find.text('Home'));await tester.pump();
+    await tester.ensureVisible(find.text('Sprint'));await tester.tap(find.text('Sprint'));
+    await tester.pump();await tester.pump(const Duration(milliseconds:500));
+    await tester.ensureVisible(find.text('Start Sprint'));await tester.tap(find.text('Start Sprint'));
+    await tester.pump();await tester.pump(const Duration(milliseconds:700));await tester.pump();
+    await tester.runAsync(()=>Future<void>.delayed(const Duration(milliseconds:20)));
+    g.lines=39;g.level=4;clearOne(g);
+    await tester.pump();await tester.pump();await tester.pump();
+    expect(find.text('Sprint complete!'),findsOneWidget);
+    expect(state.progress.data.sprintWins,1);
+    expect(state.progress.data.sprintBestMs,greaterThan(0));
+    await capture(tester,'17-sprint-complete');
+    expect(tester.takeException(),isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
 }
