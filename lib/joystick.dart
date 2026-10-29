@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 /// A thumbstick with a dead zone, repeating movement and one rotation per push.
 class GameJoystick extends StatefulWidget {
   const GameJoystick({super.key, required this.enabled, required this.onLeft,
-    required this.onRight, required this.onDown, required this.onRotate});
+    required this.onRight, required this.onDown, required this.onRotate,
+    this.repeatMilliseconds = 120});
   final bool enabled;
   final VoidCallback onLeft, onRight, onDown, onRotate;
+  final int repeatMilliseconds;
 
   @override
   State<GameJoystick> createState() => _GameJoystickState();
@@ -28,6 +30,10 @@ class _GameJoystickState extends State<GameJoystick> with WidgetsBindingObserver
   void didUpdateWidget(covariant GameJoystick oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (!widget.enabled) _stop(rebuild: false);
+    else if (oldWidget.repeatMilliseconds != widget.repeatMilliseconds && _direction > 0 && _direction != 4) {
+      _repeat?.cancel();
+      _repeat = Timer.periodic(Duration(milliseconds: widget.repeatMilliseconds.clamp(80, 220).toInt()), (_) => _emit());
+    }
   }
 
   @override
@@ -58,7 +64,7 @@ class _GameJoystickState extends State<GameJoystick> with WidgetsBindingObserver
     if (direction == 0) return;
     _emit();
     if (direction != 4) {
-      _repeat = Timer.periodic(const Duration(milliseconds: 120), (_) => _emit());
+      _repeat = Timer.periodic(Duration(milliseconds: widget.repeatMilliseconds.clamp(80, 220).toInt()), (_) => _emit());
     }
   }
 

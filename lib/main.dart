@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'game.dart';
 import 'joystick.dart';
 import 'game_audio.dart';
+import 'session_store.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -55,6 +56,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   final ZenGame game = ZenGame();
   late final GameAudio audio;
   bool musicEnabled = true;
+  double musicVolume = .28, effectsVolume = .8;
+  int joystickRepeat = 120;
+  final SessionStore sessions = SessionStore();
+  Map<String, dynamic>? _savedState;
+  bool _home = true, _loading = true;
+  Timer? _saveDebounce;
+  int _lastLocks = 0;
   Timer? timer;
   int highScore = 0;
   bool soundEnabled = true;
@@ -79,6 +87,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
+    final saved = await sessions.load();
     if (!mounted) return;
     setState(() {
       highScore = prefs.getInt('highScore') ?? 0;
@@ -87,6 +96,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       vibrationEnabled = prefs.getBool('vibrationEnabled') ?? true;
       effectsEnabled = prefs.getBool('effectsEnabled') ?? true;
       joystickEnabled = prefs.getBool('joystickEnabled') ?? true;
+      musicVolume = (prefs.getDouble('musicVolume') ?? .28).clamp(0.0, 1.0).toDouble();
+      effectsVolume = (prefs.getDouble('effectsVolume') ?? .8).clamp(0.0, 1.0).toDouble();
+      joystickRepeat = (prefs.getInt('joystickRepeat') ?? 120).clamp(80, 220).toInt();
+      _savedState = saved;
+      _loading = false;
     });
     _syncAnimations();
     _syncAudio();
@@ -99,6 +113,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     await prefs.setBool('vibrationEnabled', vibrationEnabled);
     await prefs.setBool('effectsEnabled', effectsEnabled);
     await prefs.setBool('joystickEnabled', joystickEnabled);
+    await prefs.setDouble('musicVolume', musicVolume);
+    await prefs.setDouble('effectsVolume', effectsVolume);
+    await prefs.setInt('joystickRepeat', joystickRepeat);
   }
 
   void _onGameChanged() {
@@ -125,12 +142,22 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     _syncAudio();
     if (game.over && !_wasOver && vibrationEnabled) HapticFeedback.mediumImpact();
     _wasOver = game.over;
+    if (!_loading) {
+      _saveDebounce?.cancel();
+      if (!game.started || game.over || game.paused || game.piecesLocked != _lastLocks) {
+        unawaited(_persistNow());
+      } else {
+        _saveDebounce = Timer(const Duration(milliseconds: 150), () => unawaited(_persistNow()));
+      }
+    }
+    _lastLocks = game.piecesLocked;
     if (mounted) setState(() {});
   }
 
   void _syncAudio() {
     unawaited(audio.sync(game, musicEnabled: musicEnabled,
-      effectsEnabled: soundEnabled, foreground: _foreground));
+      effectsEnabled: soundEnabled, foreground: _foreground && !_home,
+      musicVolume: musicVolume, effectsVolume: effectsVolume));
   }
 
   void _rotate() {
@@ -152,8 +179,116 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   void _act(VoidCallback action) {
     action();
     if (vibrationEnabled) HapticFeedback.selectionClick();
-    _scheduleTick();
   }
+
+  Future<void> _persistNow() {
+    _saveDebounce?.cancel();
+    if (_loading) return Future.value();
+    _savedState = game.saveState();
+    return sessions.save(_savedState);
+  }
+
+  Future<void> _startNewGame({bool confirm = true}) async {
+    if (_loading) return;
+    if (confirm && (game.saveState() != null || _savedState != null)) {
+      final replace = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Start a new game?'),
+        content: const Text('Your current saved game will be replaced. Your personal best is kept.'),
+        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('New game'))],
+      ));
+      if (replace != true || !mounted) return;
+    }
+    _saveDebounce?.cancel();
+    game.reset();
+    setState(() { _home = false; _savedState = null; });
+    game.start();
+    _scheduleTick();
+    _syncAudio();
+    unawaited(_persistNow());
+  }
+
+  void _continueGame() {
+    if (_loading) return;
+    if (!game.started || game.over) {
+      if (_savedState == null || !game.restoreState(_savedState)) {
+        setState(() => _savedState = null);
+        return;
+      }
+    }
+    setState(() => _home = false);
+    if (game.paused) game.togglePause();
+    _scheduleTick();
+    _syncAudio();
+  }
+
+  void _returnHome() {
+    if (game.started && !game.over && !game.paused) game.togglePause();
+    unawaited(_persistNow());
+    setState(() => _home = true);
+    _syncAudio();
+  }
+
+  Widget _volumeSlider(String label, double value, bool enabled, ValueChanged<double> onChanged) => Column(
+    children: [Text('$label · ${(value * 100).round()}%', style: const TextStyle(color: muted)),
+      Slider(semanticFormatterCallback: (v) => '${(v * 100).round()} percent',
+        value: value, divisions: 20, onChanged: enabled ? onChanged : null,
+        onChangeEnd: (_) => _saveSettings())],
+  );
+
+  void _showHowToPlay() => showModalBottomSheet<void>(context: context, showDragHandle: true,
+    isScrollControlled: true, backgroundColor: panel, builder: (context) => SafeArea(
+      child: SingleChildScrollView(child: Padding(padding: const EdgeInsets.all(24), child: Column(
+        mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Find your flow', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          const Text('Fill a complete horizontal row to clear it. Clear 10 rows to reach the next level.'),
+          const SizedBox(height: 16),
+          const Text('Joystick: hold left or right to move, pull down for a soft drop, push up once to rotate.'),
+          const SizedBox(height: 12),
+          const Text('Tap the board or ROTATE to turn a piece. DROP lands it immediately. The faint outline shows its landing position.'),
+          const SizedBox(height: 12),
+          const Text('Prefer buttons? Turn off Joystick controls in Settings. You can adjust joystick speed, music and effects volume there too.'),
+          const SizedBox(height: 12),
+          const Text('Your game saves automatically. Use Home to pause it, then Continue when you return.'),
+          const SizedBox(height: 20),
+          FilledButton(onPressed: () => Navigator.pop(context), child: const Text('Got it')),
+        ]))),
+    ));
+
+  Widget _buildHome() => Center(child: SingleChildScrollView(child: Padding(
+    padding: const EdgeInsets.all(24), child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 420),
+    child: Column(mainAxisSize: MainAxisSize.min, children: [
+      const Icon(Icons.auto_awesome_rounded, color: Color(0xFF25E5FF), size: 60),
+      const SizedBox(height: 16),
+      const Text('ZEN BLOCKS', textAlign: TextAlign.center,
+        style: TextStyle(fontSize: 32, letterSpacing: 3, fontWeight: FontWeight.w800)),
+      const Text('NEON AURORA', style: TextStyle(color: muted, letterSpacing: 4)),
+      const SizedBox(height: 12),
+      const Text('Find your flow in neon light.', style: TextStyle(color: muted)),
+      const SizedBox(height: 28),
+      Text('PERSONAL BEST  $highScore', style: const TextStyle(color: cream, fontSize: 18)),
+      const SizedBox(height: 24),
+      if (_loading) const Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator()),
+      if (_savedState != null) ...[
+        Text('Saved game · Score ${_savedState!['score']} · Level ${_savedState!['level']}',
+          style: const TextStyle(color: muted)),
+        const SizedBox(height: 10),
+        SizedBox(width: double.infinity, child: FilledButton.icon(
+          onPressed: _loading ? null : _continueGame, icon: const Icon(Icons.play_arrow_rounded), label: const Text('Continue'))),
+      ],
+      SizedBox(width: double.infinity, child: OutlinedButton.icon(
+        onPressed: _loading ? null : _startNewGame, icon: const Icon(Icons.add_rounded),
+        label: Text(_savedState == null ? 'Start playing' : 'Start new game'))),
+      const SizedBox(height: 12),
+      Wrap(alignment: WrapAlignment.center, spacing: 12, children: [
+        TextButton.icon(onPressed: _showHowToPlay, icon: const Icon(Icons.help_outline), label: const Text('How to play')),
+        IconButton(tooltip: 'Settings', onPressed: _showSettings, icon: const Icon(Icons.tune_rounded)),
+      ]),
+      const SizedBox(height: 20),
+      const Text('Offline play · Saved on this device · v1.2.0', style: TextStyle(color: muted, fontSize: 11)),
+    ])),
+  )));
 
   void _hideBurst() {
     burstExpiry?.cancel();
@@ -190,6 +325,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     }
     _syncAnimations();
     _syncAudio();
+    if (!_foreground) unawaited(_persistNow());
   }
 
   @override
@@ -197,6 +333,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     WidgetsBinding.instance.removeObserver(this);
     timer?.cancel();
     burstExpiry?.cancel();
+    _saveDebounce?.cancel();
+    unawaited(_persistNow());
     aurora.dispose();
     burst.dispose();
     game.removeListener(_onGameChanged);
@@ -229,8 +367,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
           SwitchListTile(title: const Text('Background music'), value: musicEnabled, onChanged: (v) {
             update(() => musicEnabled = v); setState(() {}); _syncAudio(); _saveSettings();
           }),
+          _volumeSlider('Music volume', musicVolume, musicEnabled, (v) {
+            update(() => musicVolume = v); setState(() {}); _syncAudio();
+          }),
           SwitchListTile(title: const Text('Game sound effects'), value: soundEnabled, onChanged: (v) {
             update(() => soundEnabled = v); setState(() {}); _syncAudio(); _saveSettings();
+          }),
+          _volumeSlider('Effects volume', effectsVolume, soundEnabled, (v) {
+            update(() => effectsVolume = v); setState(() {}); _syncAudio();
           }),
           SwitchListTile(title: const Text('Touch vibration'), value: vibrationEnabled, onChanged: (v) {
             update(() => vibrationEnabled = v); setState(() {}); _saveSettings();
@@ -238,10 +382,16 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
           SwitchListTile(title: const Text('Joystick controls'), value: joystickEnabled, onChanged: (v) {
             update(() => joystickEnabled = v); setState(() {}); _saveSettings();
           }),
+          if (joystickEnabled) Column(children: [
+            Text('Joystick speed · ${(100 * (220 - joystickRepeat) / 140).round()}%'),
+            Slider(label: 'Joystick speed', value: (220 - joystickRepeat).toDouble(), min: 0, max: 140, divisions: 14,
+              onChanged: (v) { update(() => joystickRepeat = 220 - v.round()); setState(() {}); },
+              onChangeEnd: (_) => _saveSettings()),
+          ]),
           SwitchListTile(title: const Text('Spectacular effects'), value: effectsEnabled, onChanged: (v) {
             update(() => _setEffectsEnabled(v));
           }),
-          const Text('Neon Aurora · 1.1.0', style: TextStyle(color: muted, fontSize: 12)),
+          const Text('Neon Aurora · 1.2.0', style: TextStyle(color: muted, fontSize: 12)),
           const Padding(padding: EdgeInsets.all(12), child: Text('Original ambient music and game sounds are bundled for offline play. Music pauses when the game is paused or the app is in the background.',
             textAlign: TextAlign.center, style: TextStyle(color: muted, fontSize: 12))),
         ]))))));
@@ -249,10 +399,12 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   @override
   Widget build(BuildContext context) {
     final next = game.nextKind;
-    return Scaffold(body: Container(
+    return PopScope(canPop: _home, onPopInvokedWithResult: (didPop, result) {
+      if (!didPop) _returnHome();
+    }, child: Scaffold(body: Container(
       decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [Color(0xFF090B31), Color(0xFF251054), Color(0xFF071638)])),
       child: Stack(children: [Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: AuroraPainter(aurora, game.level, effectsEnabled))))),
-      SafeArea(child: LayoutBuilder(builder: (context, constraints) {
+      SafeArea(child: _home ? _buildHome() : LayoutBuilder(builder: (context, constraints) {
       final available = constraints.maxHeight;
       final boardHeightPx = (available - (joystickEnabled ? 290 : 230)).clamp(200.0, 900.0);
       return SingleChildScrollView(child: Padding(padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
@@ -286,25 +438,33 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
                   decoration: BoxDecoration(color: const Color(0xE8081031), borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: const Color(0xFF38D8FF), width: 2)),
                   clipBehavior: Clip.antiAlias, child: Stack(children: [
-                    RepaintBoundary(child: CustomPaint(painter: BoardPainter(game.visibleBoard), size: Size.infinite)),
+                    RepaintBoundary(child: CustomPaint(painter: BoardPainter(game.visibleBoard, ghost: game.ghostPiece), size: Size.infinite)),
                     if (burstVisible && effectsEnabled && game.canMove) Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: SparkPainter(burst))))),
                     if (!game.started || game.paused || game.over)
                       Container(color: const Color(0xE9091030), alignment: Alignment.center,
                         child: Column(mainAxisSize: MainAxisSize.min, children: [
-                          Icon(game.over ? Icons.emoji_events_outlined : Icons.spa_outlined, color: muted, size: 44),
-                          const SizedBox(height: 12),
-                          Text(game.over ? 'Aurora fades'  : game.paused ? 'Paused in starlight' : 'Light up the night',
-                            textAlign: TextAlign.center, style: const TextStyle(color: cream, fontSize: 19, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 12),
-                          ElevatedButton(onPressed: () => _act(() {
-                            if (game.paused) { game.togglePause(); } else { game.start(); }
-                          }), child: Text(game.paused ? 'Resume' : game.over ? 'Play again' : 'Start playing')),
+                          Icon(game.over ? Icons.emoji_events_outlined : Icons.pause_circle_outline, color: muted, size: 36),
+                          const SizedBox(height: 8),
+                          Text(game.over ? 'Aurora fades' : 'Paused',
+                            style: const TextStyle(color: cream, fontSize: 20, fontWeight: FontWeight.bold)),
+                          if (game.over) ...[
+                            const SizedBox(height: 8),
+                            Text('Score ${game.score}  ·  Best $highScore', style: const TextStyle(color: cream)),
+                            Text('${game.lines} lines  ·  Level ${game.level}', style: const TextStyle(color: muted)),
+                          ],
+                          const SizedBox(height: 10),
+                          ElevatedButton(onPressed: () {
+                            if (game.paused) { game.togglePause(); _scheduleTick(); }
+                            else { _startNewGame(confirm: false); }
+                          }, child: Text(game.over ? 'Play again' : 'Resume')),
+                          if (game.paused) TextButton(onPressed: _startNewGame, child: const Text('Restart')),
+                          TextButton(onPressed: _returnHome, child: const Text('Home')),
                         ])),
                   ])))),
             )),
           const SizedBox(height: 14),
           if (joystickEnabled) Row(children: [
-            GameJoystick(enabled: game.canMove,
+            GameJoystick(enabled: game.canMove, repeatMilliseconds: joystickRepeat,
               onLeft: () => game.move(-1, 0),
               onRight: () => game.move(1, 0),
               onDown: game.softDrop, onRotate: _rotate),
@@ -319,17 +479,31 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
             _control(Icons.keyboard_double_arrow_down_rounded, 'DROP', game.hardDrop),
           ]),
         ])));
-    })) ])));
+    })) ]))));
   }
 }
 
 class BoardPainter extends CustomPainter {
-  BoardPainter(this.cells);
+  BoardPainter(this.cells, {this.ghost});
   final List<List<int>> cells;
+  final Piece? ghost;
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width / boardWidth;
     final h = size.height / boardHeight;
+    final landing = ghost;
+    if (landing != null) {
+      final color = blockColors[landing.kind];
+      for (var row = 0; row < landing.cells.length; row++) {
+        for (var col = 0; col < landing.cells[row].length; col++) {
+          final x = landing.x + col, y = landing.y + row;
+          if (landing.cells[row][col] == 0 || y < 0 || y >= boardHeight || x < 0 || x >= boardWidth || cells[y][x] != 0) continue;
+          final rect = RRect.fromRectAndRadius(Rect.fromLTWH(x*w+2, y*h+2, w-4, h-4), const Radius.circular(4));
+          canvas.drawRRect(rect, Paint()..color = color.withValues(alpha: .12));
+          canvas.drawRRect(rect, Paint()..color = color.withValues(alpha: .65)..style = PaintingStyle.stroke..strokeWidth = 1.3);
+        }
+      }
+    }
     final grid = Paint()..color = const Color(0xFF354B91)..style = PaintingStyle.stroke..strokeWidth = 0.5;
     for (var y = 0; y < boardHeight; y++) {
       for (var x = 0; x < boardWidth; x++) {

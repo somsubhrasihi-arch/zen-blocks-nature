@@ -81,6 +81,87 @@ class ZenGame extends ChangeNotifier {
 
   bool get canMove => started && !over && !paused && active != null;
 
+  Piece? get ghostPiece {
+    final piece = active;
+    if (!started || over || piece == null) return null;
+    var landingY = piece.y;
+    while (_fits(piece.cells, piece.x, landingY + 1)) { landingY++; }
+    return Piece(piece.kind, piece.cells, piece.x, landingY);
+  }
+
+  Map<String, dynamic>? saveState() {
+    final piece = active;
+    if (!started || over || piece == null) return null;
+    return {
+      'version': 1,
+      'board': board.map((row) => List<int>.from(row)).toList(),
+      'piece': {'kind': piece.kind, 'x': piece.x, 'y': piece.y,
+        'cells': piece.cells.map((row) => List<int>.from(row)).toList()},
+      'nextKind': nextKind, 'bag': List<int>.from(_bag),
+      'score': score, 'lines': lines, 'level': level, 'combo': combo,
+      'piecesLocked': piecesLocked,
+    };
+  }
+
+  /// Validate the complete snapshot before changing the running game.
+  /// Restored games always wait for an explicit resume.
+  bool restoreState(Object? value) {
+    try {
+      if (value is! Map || value['version'] != 1) return false;
+      List<List<int>> matrix(Object? source) => (source as List)
+          .map((row) => (row as List).cast<int>().toList()).toList();
+      final savedBoard = matrix(value['board']);
+      if (savedBoard.length != boardHeight || savedBoard.any((row) =>
+          row.length != boardWidth || row.any((cell) => cell < 0 || cell > 7))) return false;
+      final savedPiece = value['piece'] as Map;
+      final kind = savedPiece['kind'] as int;
+      final x = savedPiece['x'] as int;
+      final y = savedPiece['y'] as int;
+      if (kind < 0 || kind >= shapes.length || y < 0 || y >= boardHeight) return false;
+      final cells = matrix(savedPiece['cells']);
+      var rotation = shapes[kind];
+      var validShape = false;
+      bool same(List<List<int>> a, List<List<int>> b) => a.length == b.length &&
+          List.generate(a.length, (r) => a[r].length == b[r].length &&
+            List.generate(a[r].length, (c) => a[r][c] == b[r][c]).every((v) => v)).every((v) => v);
+      for (var i = 0; i < 4; i++) {
+        if (same(cells, rotation)) validShape = true;
+        rotation = List.generate(rotation.first.length,
+          (r) => List.generate(rotation.length, (c) => rotation[rotation.length - 1 - c][r]));
+      }
+      if (!validShape) return false;
+      for (var r = 0; r < cells.length; r++) {
+        for (var c = 0; c < cells[r].length; c++) {
+          if (cells[r][c] == 0) continue;
+          final bx = x + c, by = y + r;
+          if (bx < 0 || bx >= boardWidth || by >= boardHeight || savedBoard[by][bx] != 0) return false;
+        }
+      }
+      final next = value['nextKind'] as int;
+      final bag = (value['bag'] as List).cast<int>().toList();
+      if (next < 0 || next > 6 || bag.length > 7 || bag.toSet().length != bag.length ||
+          bag.any((item) => item < 0 || item > 6)) return false;
+      final savedScore = value['score'] as int;
+      final savedLines = value['lines'] as int;
+      final savedLevel = value['level'] as int;
+      final savedCombo = value['combo'] as int;
+      final locks = value['piecesLocked'] as int;
+      if (savedScore < 0 || savedLines < 0 || savedLevel != 1 + savedLines ~/ 10 ||
+          savedCombo < -1 || locks < 0) return false;
+      board = savedBoard;
+      active = Piece(kind, cells, x, y);
+      nextKind = next;
+      _bag..clear()..addAll(bag);
+      score = savedScore; lines = savedLines; level = savedLevel;
+      combo = savedCombo; piecesLocked = locks;
+      started = true; paused = true; over = false;
+      notifyListeners();
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   bool _fits(List<List<int>> cells, int x, int y) {
     for (var row = 0; row < cells.length; row++) {
       for (var col = 0; col < cells[row].length; col++) {

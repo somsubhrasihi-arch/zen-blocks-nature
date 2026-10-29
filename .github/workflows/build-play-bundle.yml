@@ -1,0 +1,64 @@
+name: Check Play Store bundle
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      sign_release:
+        description: Sign with the upload key stored in repository secrets
+        type: boolean
+        default: false
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      SIGN_RELEASE: ${{ inputs.sign_release && 'true' || 'false' }}
+      ZEN_UPLOAD_KEYSTORE_PATH: ${{ runner.temp }}/zen-upload.jks
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.8'
+          channel: stable
+          cache: true
+      - name: Generate Android platform
+        run: flutter create --platforms=android --org com.zenblocks.nature .
+      - name: Configure release identity, target API and signing
+        env:
+          ZEN_UPLOAD_KEYSTORE_BASE64: ${{ secrets.ZEN_UPLOAD_KEYSTORE_BASE64 }}
+          ZEN_UPLOAD_STORE_PASSWORD: ${{ secrets.ZEN_UPLOAD_STORE_PASSWORD }}
+          ZEN_UPLOAD_KEY_ALIAS: ${{ secrets.ZEN_UPLOAD_KEY_ALIAS }}
+          ZEN_UPLOAD_KEY_PASSWORD: ${{ secrets.ZEN_UPLOAD_KEY_PASSWORD }}
+        run: python tools/configure_release.py --signed "$SIGN_RELEASE"
+      - name: Install dependencies and run tests
+        run: |
+          flutter pub get
+          rm -f test/widget_test.dart
+          flutter test
+      - name: Build release bundle
+        env:
+          ZEN_UPLOAD_STORE_PASSWORD: ${{ secrets.ZEN_UPLOAD_STORE_PASSWORD }}
+          ZEN_UPLOAD_KEY_ALIAS: ${{ secrets.ZEN_UPLOAD_KEY_ALIAS }}
+          ZEN_UPLOAD_KEY_PASSWORD: ${{ secrets.ZEN_UPLOAD_KEY_PASSWORD }}
+        run: flutter build appbundle --release
+      - name: Verify bundle signing state
+        run: |
+          python - <<'PY'
+          import os, zipfile
+          bundle = 'build/app/outputs/bundle/release/app-release.aab'
+          with zipfile.ZipFile(bundle) as archive:
+              signed = any(name.startswith('META-INF/') and name.endswith(('.RSA', '.DSA', '.EC')) for name in archive.namelist())
+          assert signed == (os.environ['SIGN_RELEASE'] == 'true'), 'Unexpected bundle signing state'
+          print('Bundle signing state verified.')
+          PY
+      - name: Upload bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.sign_release && 'ZenBlocks-PlayStore-AAB' || 'ZenBlocks-UNSIGNED-Release-Preview' }}
+          path: build/app/outputs/bundle/release/app-release.aab
+          retention-days: 14
+      - name: Remove temporary upload key
+        if: always()
+        run: rm -f "$ZEN_UPLOAD_KEYSTORE_PATH"

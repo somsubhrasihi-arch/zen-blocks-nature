@@ -3,6 +3,9 @@
 An original falling-block puzzle for Android, built with Flutter and a Neon Aurora visual theme.
 
 ## Features
+- Home screen, how-to-play guide, game-over summary and restart confirmation
+- Automatic local game saves with Continue, plus a ghost-piece landing preview
+- Independent music/effects volume sliders and adjustable joystick repeat speed
 - Larger board with the next-piece preview above it, plus optional touch joystick controls
 - Seven classic geometric tetromino shapes with a randomized 7-piece bag
 - 10 × 20 board, line clears, combos, scoring and a next-piece preview
@@ -92,3 +95,6 @@ This is a playable prototype. It has no online leaderboard, cloud sync or produc
 
 ## Android APK workflow
 The existing `.github/workflows/build-apk.yml` is preserved. A push to `main` or a manual run of **Build Zen Blocks Android APK** generates Android scaffolding, removes the generated default widget test, runs the project tests and builds a debug APK. Download the **ZenBlocks-Nature-Android-APK** artifact and extract `app-debug.apk`. The artifact name and Android organization (`com.zenblocks.nature`) remain unchanged. See [MOBILE_GITHUB_BUILD.md](MOBILE_GITHUB_BUILD.md) for phone instructions.
+
+## Play Store preparation
+See [PLAY_STORE_RELEASE.md](PLAY_STORE_RELEASE.md) for the unsigned release-preview workflow, upload signing setup, and remaining store requirements.

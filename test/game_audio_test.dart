@@ -103,6 +103,8 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(ZenBlocksApp(audio: GameAudio(backend: FakeAudioBackend())));
     await tester.pump();
+    await tester.tap(find.text('Start playing'));
+    await tester.pump();
     final board = find.byWidgetPredicate((w) => w is CustomPaint && w.painter is BoardPainter);
     final size = tester.getSize(board);
     expect(size.height, greaterThan(590));

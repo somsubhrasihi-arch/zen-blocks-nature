@@ -7,6 +7,19 @@ import 'package:zen_blocks/game_audio.dart';
 import 'fake_audio.dart';
 
 void main() {
+  testWidgets('joystick repeat speed can be adjusted', (tester) async {
+    var moves = 0;
+    await tester.pumpWidget(MaterialApp(home: Center(child: GameJoystick(
+      enabled: true, repeatMilliseconds: 200, onLeft: () => moves++,
+      onRight: () {}, onDown: () {}, onRotate: () {}))));
+    final touch = await tester.startGesture(
+      tester.getCenter(find.byType(GameJoystick)) + const Offset(-35, 0));
+    await tester.pump(const Duration(milliseconds: 199));
+    expect(moves, 1);
+    await tester.pump(const Duration(milliseconds: 201));
+    expect(moves, 3);
+    await touch.up();
+  });
   testWidgets('holding moves repeatedly and release stops movement', (tester) async {
     var left = 0;
     var right = 0;
@@ -68,6 +81,8 @@ void main() {
   testWidgets('saved button preference keeps original controls available', (tester) async {
     SharedPreferences.setMockInitialValues({'joystickEnabled': false});
     await tester.pumpWidget(ZenBlocksApp(audio: GameAudio(backend: FakeAudioBackend())));
+    await tester.pump();
+    await tester.tap(find.text('Start playing'));
     await tester.pump();
     expect(find.byType(GameJoystick), findsNothing);
     expect(find.text('LEFT'), findsOneWidget);

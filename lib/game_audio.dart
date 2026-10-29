@@ -35,6 +35,7 @@ abstract class AudioBackend {
   Future<void> music(bool playing);
   Future<void> effect(SoundCue cue);
   Future<void> stopEffects();
+  Future<void> volumes(double music, double effects);
   Future<void> dispose();
 }
 
@@ -76,6 +77,12 @@ class DeviceAudioBackend implements AudioBackend {
   }
 
   @override
+  Future<void> volumes(double music, double effects) async {
+    await _music?.setVolume(music);
+    for (final player in _effects.values) { await player.setVolume(effects); }
+  }
+
+  @override
   Future<void> dispose() async {
     await _music?.dispose();
     for (final player in _effects.values) { await player.dispose(); }
@@ -91,6 +98,7 @@ class GameAudio {
   Future<void> _queue = Future.value();
   Future<void>? _initialization;
   bool _disposed = false, _playing = false, _effects = false, _audible = false;
+  double _musicVolume = .28, _effectsVolume = .8;
 
   Future<void> _enqueue(Future<void> Function() action) {
     _queue = _queue.then((_) async {
@@ -108,21 +116,27 @@ class GameAudio {
   Future<void> prepare() => _enqueue(() async {});
 
   Future<void> sync(ZenGame game, {required bool musicEnabled,
-    required bool effectsEnabled, required bool foreground}) {
+    required bool effectsEnabled, required bool foreground,
+    double musicVolume = .28, double effectsVolume = .8}) {
+    musicVolume = musicVolume.clamp(0.0, 1.0).toDouble();
+    effectsVolume = effectsVolume.clamp(0.0, 1.0).toDouble();
     final cues = _tracker.update(game);
     final active = foreground && game.started && !game.paused && !game.over;
-    final playing = active && musicEnabled;
-    final effects = active && effectsEnabled;
+    final playing = active && musicEnabled && musicVolume > 0;
+    final effects = active && effectsEnabled && effectsVolume > 0;
     final musicChanged = playing != _playing;
-    final audible = foreground && effectsEnabled && !game.paused;
+    final audible = foreground && effectsEnabled && effectsVolume > 0 && !game.paused;
     final silence = (!effects && _effects) || (!audible && _audible);
     _playing = playing;
     _effects = effects;
     _audible = audible;
+    final volumeChanged = musicVolume != _musicVolume || effectsVolume != _effectsVolume;
+    _musicVolume = musicVolume; _effectsVolume = effectsVolume;
     // Game over may play its final cue while music is stopped.
     final sounds = audible ? cues : <SoundCue>[];
-    if (!musicChanged && !silence && sounds.isEmpty) return _queue;
+    if (!musicChanged && !silence && !volumeChanged && sounds.isEmpty) return _queue;
     return _enqueue(() async {
+      if (volumeChanged) await _backend.volumes(musicVolume, effectsVolume);
       if (musicChanged) await _backend.music(playing);
       if (silence) await _backend.stopEffects();
       for (final cue in sounds) { await _backend.effect(cue); }

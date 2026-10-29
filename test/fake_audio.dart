@@ -5,6 +5,9 @@ class FakeAudioBackend implements AudioBackend {
   final musicStates = <bool>[];
   int stops = 0;
   bool disposed = false;
+  final levels = <List<double>>[];
+  @override
+  Future<void> volumes(double music, double effects) async { levels.add([music, effects]); }
   @override
   Future<void> initialize() async {}
   @override
