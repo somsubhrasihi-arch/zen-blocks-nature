@@ -46,12 +46,14 @@ Future<void> mount(WidgetTester tester, Size size) async {
 }
 
 Future<void> capture(WidgetTester tester, String name) async {
-  final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(captureKey));
-  final image = await boundary.toImage(pixelRatio: 1.5);
-  final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-  final directory = Directory('build/ui-previews')..createSync(recursive: true);
-  File('${directory.path}/$name.png').writeAsBytesSync(bytes!.buffer.asUint8List());
-  image.dispose();
+  await tester.runAsync(() async {
+    final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(captureKey));
+    final image = await boundary.toImage(pixelRatio: 1.5);
+    final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+    final directory = Directory('build/ui-previews')..createSync(recursive: true);
+    File('${directory.path}/$name.png').writeAsBytesSync(bytes!.buffer.asUint8List());
+    image.dispose();
+  });
 }
 
 void main() {
@@ -81,16 +83,18 @@ void main() {
   testWidgets('board border paints continuously on all four sides', (tester) async {
     await mount(tester, const Size(412, 900));
     await tester.tap(find.text('Start playing')); await tester.pump();
-    final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(const ValueKey('board-frame-capture')));
-    final image = await boundary.toImage();
-    final data = (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!.buffer.asUint8List();
-    final expected = [56, 216, 255, 255];
-    for (final point in [Offset(image.width/2, 1), Offset(1, image.height/2),
-      Offset((image.width-2).toDouble(), image.height/2), Offset(image.width/2, (image.height-2).toDouble())]) {
-      final index = (point.dy.floor()*image.width + point.dx.floor())*4;
-      expect(data.sublist(index, index+4), expected);
-    }
-    image.dispose();
+    await tester.runAsync(() async {
+      final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(const ValueKey('board-frame-capture')));
+      final image = await boundary.toImage();
+      final data = (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!.buffer.asUint8List();
+      final expected = [56, 216, 255, 255];
+      for (final point in [Offset(image.width/2, 1), Offset(1, image.height/2),
+        Offset((image.width-2).toDouble(), image.height/2), Offset(image.width/2, (image.height-2).toDouble())]) {
+        final index = (point.dy.floor()*image.width + point.dx.floor())*4;
+        expect(data.sublist(index, index+4), expected);
+      }
+      image.dispose();
+    });
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
