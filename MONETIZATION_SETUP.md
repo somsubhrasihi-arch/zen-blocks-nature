@@ -41,3 +41,6 @@ For live activation, first complete account/app readiness, privacy messaging, st
 The sample-ad debug mode does not request production consent forms; it cannot select a live ad unit. Production mode updates UMP at launch, checks canRequestAds before loading, and displays the privacy options control when required. Payment activation and its secure backend remain separate unfinished work.
 
 Phone test: enter Journey to reserve a life; open Rewards; tap Watch test ad; complete the rewarded action; confirm one life is added (up to five). Close another ad early and check no life is awarded. A real device/network test is still required; unit tests and APK compilation cannot confirm ad delivery on a phone.
+
+
+Version 1.9.2 preserves SDK load/show failures and distinguishes request timeouts. Debug builds include expandable Ad test details (stage, unit, error code/domain/message) after a failed request. No error report is automatically sent anywhere. The user can share that text to diagnose device/network failures. SDK initialization and loading are bounded, late loaded ads are disposed, and failed requests release the busy state without granting lives. The sample unit and sample manifest App ID remain unchanged. Runtime ad delivery still requires a phone/network test.

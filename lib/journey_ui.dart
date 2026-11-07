@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'monetization.dart';
 import 'play_modes.dart';
 import 'arcade_ui.dart';
@@ -206,9 +207,13 @@ class _AdventureHubState extends State<AdventureHub> {
         const SizedBox(height: 10), Text(lives == 5 ? 'Lives full. Your next adventure is ready.' : 'Next free life in ${remaining.inMinutes.toString().padLeft(2, '0')}:${(remaining.inSeconds % 60).toString().padLeft(2, '0')}', style: TextStyle(color: p.muted)),
         const SizedBox(height: 8), Text('One life is reserved when you enter a stage and returned when you win. Resuming costs nothing. A restart or abandoned attempt uses that life. One free life every 30 minutes, up to 5. Other modes need no lives.', style: TextStyle(color: p.muted, fontSize: 12, height: 1.5)),
         const SizedBox(height: 12), button('Refill to 5 · 150 coins', Icons.favorite_rounded, busy || lives == 5 || data.coins < 150 ? null : () => perform(() => widget.progress.refillWithCoins())),
-        const SizedBox(height: 8), button(Monetization.testAds ? 'Watch test ad · +1 life' : 'Watch an ad · +1 life', Icons.ondemand_video_rounded,
+        const SizedBox(height: 8), button(widget.monetization?.usingTestAds == true ? 'Watch test ad · +1 life' : 'Watch an ad · +1 life', Icons.ondemand_video_rounded,
           busy || lives == 5 || service == null || !service.adsConfigured || service.busy ? null : () => perform(() => service.watchForLife())),
         const SizedBox(height: 8), Text(service?.adsConfigured == true ? service!.adStatus : 'Rewarded ads are not available in this build.', style: TextStyle(color: p.muted, fontSize: 12)),
+        if (kDebugMode && service?.adDiagnostic != null) ExpansionTile(
+          title: const Text('Ad test details'),
+          childrenPadding: const EdgeInsets.all(12),
+          children: [SelectableText(service!.adDiagnostic!, style: TextStyle(color: p.muted, fontSize: 12))]),
         if (service?.privacyOptionsRequired == true) TextButton(onPressed: service!.privacyOptions, child: const Text('Ad privacy choices')),
         TextButton(onPressed: () => setState(() => tab = 1), child: const Text('Get coin packs')),
       ])),

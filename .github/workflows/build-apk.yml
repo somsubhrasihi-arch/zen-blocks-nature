@@ -2,7 +2,7 @@ name: Build Zen Blocks Android APK
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, fix/rewarded-ad-diagnostics-1-9-2]
 jobs:
   build-apk:
     runs-on: ubuntu-latest
@@ -19,6 +19,17 @@ jobs:
         run: flutter create --platforms=android --org com.zenblocks.nature .
       - name: Apply app name and T-piece launcher icon
         run: python tools/configure_branding.py
+      - name: Verify sample AdMob manifest configuration
+        run: |
+          python - <<'PYCODE'
+          import xml.etree.ElementTree as ET
+          root = ET.parse('android/app/src/main/AndroidManifest.xml').getroot()
+          ns = '{http://schemas.android.com/apk/res/android}'
+          entries = [m.get(ns+'value') for m in root.find('application').findall('meta-data') if m.get(ns+'name') == 'com.google.android.gms.ads.APPLICATION_ID']
+          assert entries == ['ca-app-pub-3940256099942544~3347511713'], 'Test APK must use the Google sample App ID'
+          assert any(p.get(ns+'name') == 'android.permission.INTERNET' for p in root.findall('uses-permission')), 'Internet permission missing'
+          print('Sample App ID and internet permission verified.')
+          PYCODE
       - name: Install dependencies
         run: flutter pub get
       - name: Check native validation tools

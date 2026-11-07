@@ -13,7 +13,17 @@ import 'package:in_app_purchase_android/in_app_purchase_android.dart';
 
 /// Live services are opt-in build configuration; never simulate a payment/ad.
 class Monetization extends ChangeNotifier {
-  Monetization(this.progress);
+  Monetization(this.progress, {AdsConfiguration? adConfiguration,
+    Future<void> Function()? initializeAds,
+    Future<RewardedAd?> Function(String unit)? loadAd})
+    : configuration = adConfiguration ?? ads,
+      _initializeAds = initializeAds, _loadAd = loadAd;
+  final AdsConfiguration configuration;
+  final Future<void> Function()? _initializeAds;
+  final Future<RewardedAd?> Function(String unit)? _loadAd;
+  String? adDiagnostic;
+  bool get usingTestAds => configuration.testMode;
+
   final ProgressStore progress;
   static const testAds = bool.fromEnvironment('ADS_TEST_MODE');
   static const ads = AdsConfiguration(testMode: testAds,
@@ -50,9 +60,9 @@ class Monetization extends ChangeNotifier {
     if (!_disposed) notifyListeners();
   }
 
-  String status = 'Purchases and ads are not available in this build.';
+  String status = 'Purchases are not available in this build.';
   bool get adsConfigured =>
-      rewardedUnit.isNotEmpty &&
+      configuration.enabled &&
       !kIsWeb &&
       defaultTargetPlatform == TargetPlatform.android;
   bool get billingConfigured =>
@@ -63,9 +73,9 @@ class Monetization extends ChangeNotifier {
     if (_initialized) return;
     _initialized = true;
     if (adsConfigured) {
-      adStatus = testAds ? 'Test ads enabled · No advertising revenue' : 'Watch an optional ad for one extra life.';
+      adStatus = usingTestAds ? 'Test ads enabled · No advertising revenue' : 'Watch an optional ad for one extra life.';
       // A fresh UMP update is requested on each launch for production ads.
-      if (!testAds) _consentRequest = _refreshConsent();
+      if (!usingTestAds) _consentRequest = _refreshConsent();
       _emit();
     }
     if (!billingConfigured) return;
@@ -211,64 +221,80 @@ class Monetization extends ChangeNotifier {
       await InAppPurchase.instance.restorePurchases();
   }
 
+  /// Preserve SDK failures rather than collapsing every failure into no-fill.
+  Future<RewardedAd?> _requestRewardedAd(String unit) async {
+    if (_loadAd != null) return await _loadAd(unit);
+    final result = Completer<RewardedAd?>();
+    var accepting = true;
+    unawaited(RewardedAd.load(adUnitId: unit, request: const AdRequest(),
+      rewardedAdLoadCallback: RewardedAdLoadCallback(
+        onAdLoaded: (ad) {
+          if (!accepting || result.isCompleted || _disposed) { ad.dispose(); }
+          else { result.complete(ad); }
+        },
+        onAdFailedToLoad: (error) {
+          if (accepting && !result.isCompleted) result.completeError(error);
+        },
+      )).catchError((Object error, StackTrace stack) {
+        if (accepting && !result.isCompleted) result.completeError(error, stack);
+      }));
+    try { return await result.future.timeout(const Duration(seconds: 40)); }
+    finally { accepting = false; }
+  }
+  void _adFailed(String stage, Object error) {
+    final sdk = error is AdError ? error : null;
+    adStatus = error is TimeoutException
+      ? 'The ad request timed out. Check your connection and try again.'
+      : 'The ad could not ${stage == 'Showing ad' ? 'open' : 'load'}. Please try again.';
+    if (kDebugMode) {
+      final reason = sdk == null ? '$error' : 'Code: ${sdk.code}\nDomain: ${sdk.domain}\nMessage: ${sdk.message}';
+      adDiagnostic = 'Stage: $stage\nMode: ${usingTestAds ? 'Google sample test ad' : 'Configured ad unit'}\nUnit: ${configuration.rewardedUnit}\n$reason';
+      if (sdk != null) adStatus += ' (Error ${sdk.code})';
+    }
+    _emit();
+  }
   Future<bool> watchForLife() async {
-    if (!adsConfigured || busy || progress.data.livesAt(progress.now) >= 5)
-      return false;
-    busy = true;
+    if (!adsConfigured || busy || progress.data.livesAt(progress.now) >= 5) return false;
+    busy = true; adDiagnostic = null;
+    var stage = 'Initializing ad SDK';
     _emit();
     try {
-      adStatus = testAds ? 'Loading test ad…' : 'Loading rewarded ad…'; _emit();
-      if (!testAds) {
+      adStatus = usingTestAds ? 'Loading test ad…' : 'Loading rewarded ad…'; _emit();
+      if (!usingTestAds) {
+        stage = 'Privacy consent';
         var allowed = await (_consentRequest ??= _refreshConsent());
-        if (!allowed) { allowed = await (_consentRequest = _refreshConsent()); }
+        if (!allowed) allowed = await (_consentRequest = _refreshConsent());
         if (!allowed) { adStatus = 'Ads are unavailable with the current privacy settings.'; return false; }
       }
-      await MobileAds.instance.initialize();
-      final loaded = Completer<RewardedAd?>();
-      RewardedAd.load(
-        adUnitId: rewardedUnit,
-        request: const AdRequest(),
-        rewardedAdLoadCallback: RewardedAdLoadCallback(
-          onAdLoaded: (ad) { if (loaded.isCompleted || _disposed) { ad.dispose(); } else { loaded.complete(ad); } },
-          onAdFailedToLoad: (_) { if (!loaded.isCompleted) loaded.complete(null); },
-        ),
-      );
-      final ad = await loaded.future.timeout(const Duration(seconds: 30), onTimeout: () { if (!loaded.isCompleted) loaded.complete(null); return null; });
+      stage = 'Initializing ad SDK';
+      if (_initializeAds != null) { await _initializeAds().timeout(const Duration(seconds: 20)); }
+      else { await MobileAds.instance.initialize().timeout(const Duration(seconds: 20)); }
+      stage = 'Loading rewarded ad';
+      final ad = await _requestRewardedAd(configuration.rewardedUnit);
       if (ad == null || _disposed) {
         ad?.dispose();
-        adStatus = 'No ad available. Please try again later.';
+        if (!_disposed) _adFailed(stage, StateError('No ad returned by the SDK'));
         return false;
       }
+      stage = 'Showing ad';
       final closed = Completer<void>();
       Future<bool>? grant;
+      AdError? showError;
       ad.fullScreenContentCallback = FullScreenContentCallback(
-        onAdDismissedFullScreenContent: (ad) {
-          ad.dispose();
-          closed.complete();
-        },
+        onAdDismissedFullScreenContent: (ad) { ad.dispose(); if (!closed.isCompleted) closed.complete(); },
         onAdFailedToShowFullScreenContent: (ad, error) {
-          ad.dispose();
-          closed.complete();
+          showError = error; ad.dispose(); if (!closed.isCompleted) closed.complete();
         },
       );
-      ad.show(
-        onUserEarnedReward: (_, reward) {
-          grant ??= progress.grantAdLife();
-        },
-      );
+      await ad.show(onUserEarnedReward: (_, reward) { grant ??= progress.grantAdLife(); });
       await closed.future;
+      if (showError != null) { _adFailed(stage, showError!); return false; }
+      stage = 'Saving life reward';
       final earned = grant != null && await grant!;
-      adStatus = earned
-          ? 'One life added!'
-          : 'Finish the rewarded ad to receive a life.';
+      adStatus = earned ? 'One life added!' : 'Finish the rewarded ad to receive a life.';
       return earned;
-    } catch (_) {
-      adStatus = 'Ad unavailable. Please try again later.';
-      return false;
-    } finally {
-      busy = false;
-      _emit();
-    }
+    } catch (error) { _adFailed(stage, error); return false; }
+    finally { busy = false; _emit(); }
   }
 
   Future<void> privacyOptions() async {
