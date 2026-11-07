@@ -7,6 +7,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 
 import 'progress_store.dart';
+import 'ads_config.dart';
 
 import 'package:in_app_purchase_android/in_app_purchase_android.dart';
 
@@ -14,7 +15,31 @@ import 'package:in_app_purchase_android/in_app_purchase_android.dart';
 class Monetization extends ChangeNotifier {
   Monetization(this.progress);
   final ProgressStore progress;
-  static const rewardedUnit = String.fromEnvironment('REWARDED_AD_UNIT_ID');
+  static const testAds = bool.fromEnvironment('ADS_TEST_MODE');
+  static const ads = AdsConfiguration(testMode: testAds,
+    productionRewardedUnit: String.fromEnvironment('REWARDED_AD_UNIT_ID'));
+  static String get rewardedUnit => ads.rewardedUnit;
+  String adStatus = 'Rewarded ads are not available in this build.';
+  bool privacyOptionsRequired = false;
+  Future<bool>? _consentRequest;
+  Future<bool> _refreshConsent() async {
+    final result = Completer<bool>();
+    Future<void> finish() async {
+      try {
+        final allowed = await ConsentInformation.instance.canRequestAds();
+        privacyOptionsRequired = await ConsentInformation.instance.getPrivacyOptionsRequirementStatus() == PrivacyOptionsRequirementStatus.required;
+        if (!result.isCompleted) result.complete(allowed);
+        _emit();
+      } catch (_) { if (!result.isCompleted) result.complete(false); }
+    }
+    try {
+      ConsentInformation.instance.requestConsentInfoUpdate(ConsentRequestParameters(), () {
+        if (_disposed || result.isCompleted) { if (!result.isCompleted) result.complete(false); return; }
+        ConsentForm.loadAndShowConsentFormIfRequired((_) { unawaited(finish()); });
+      }, (_) { unawaited(finish()); });
+      return await result.future.timeout(const Duration(seconds: 30), onTimeout: () { if (!result.isCompleted) result.complete(false); return false; });
+    } catch (_) { return false; }
+  }
   static const verificationUrl = String.fromEnvironment('PURCHASE_VERIFY_URL');
   static const productIds = {'tblock_coins_500', 'tblock_coins_1500'};
   final Map<String, ProductDetails> products = {};
@@ -37,6 +62,12 @@ class Monetization extends ChangeNotifier {
   Future<void> initialize() async {
     if (_initialized) return;
     _initialized = true;
+    if (adsConfigured) {
+      adStatus = testAds ? 'Test ads enabled · No advertising revenue' : 'Watch an optional ad for one extra life.';
+      // A fresh UMP update is requested on each launch for production ads.
+      if (!testAds) _consentRequest = _refreshConsent();
+      _emit();
+    }
     if (!billingConfigured) return;
     _subscription = InAppPurchase.instance.purchaseStream.listen(
       (updates) {
@@ -186,22 +217,11 @@ class Monetization extends ChangeNotifier {
     busy = true;
     _emit();
     try {
-      final consent = Completer<bool>();
-      ConsentInformation.instance.requestConsentInfoUpdate(
-        ConsentRequestParameters(),
-        () {
-          ConsentForm.loadAndShowConsentFormIfRequired((error) async {
-            consent.complete(
-              error == null &&
-                  await ConsentInformation.instance.canRequestAds(),
-            );
-          });
-        },
-        (_) => consent.complete(false),
-      );
-      if (!await consent.future) {
-        status = 'Ads are unavailable with the current privacy settings.';
-        return false;
+      adStatus = testAds ? 'Loading test ad…' : 'Loading rewarded ad…'; _emit();
+      if (!testAds) {
+        var allowed = await (_consentRequest ??= _refreshConsent());
+        if (!allowed) { allowed = await (_consentRequest = _refreshConsent()); }
+        if (!allowed) { adStatus = 'Ads are unavailable with the current privacy settings.'; return false; }
       }
       await MobileAds.instance.initialize();
       final loaded = Completer<RewardedAd?>();
@@ -209,13 +229,14 @@ class Monetization extends ChangeNotifier {
         adUnitId: rewardedUnit,
         request: const AdRequest(),
         rewardedAdLoadCallback: RewardedAdLoadCallback(
-          onAdLoaded: loaded.complete,
-          onAdFailedToLoad: (_) => loaded.complete(null),
+          onAdLoaded: (ad) { if (loaded.isCompleted || _disposed) { ad.dispose(); } else { loaded.complete(ad); } },
+          onAdFailedToLoad: (_) { if (!loaded.isCompleted) loaded.complete(null); },
         ),
       );
-      final ad = await loaded.future;
-      if (ad == null) {
-        status = 'No ad available. Please try again later.';
+      final ad = await loaded.future.timeout(const Duration(seconds: 30), onTimeout: () { if (!loaded.isCompleted) loaded.complete(null); return null; });
+      if (ad == null || _disposed) {
+        ad?.dispose();
+        adStatus = 'No ad available. Please try again later.';
         return false;
       }
       final closed = Completer<void>();
@@ -237,12 +258,12 @@ class Monetization extends ChangeNotifier {
       );
       await closed.future;
       final earned = grant != null && await grant!;
-      status = earned
+      adStatus = earned
           ? 'One life added!'
           : 'Finish the rewarded ad to receive a life.';
       return earned;
     } catch (_) {
-      status = 'Ad unavailable. Please try again later.';
+      adStatus = 'Ad unavailable. Please try again later.';
       return false;
     } finally {
       busy = false;
@@ -251,7 +272,12 @@ class Monetization extends ChangeNotifier {
   }
 
   Future<void> privacyOptions() async {
-    if (adsConfigured) ConsentForm.showPrivacyOptionsForm((_) {});
+    if (adsConfigured && privacyOptionsRequired) {
+      ConsentForm.showPrivacyOptionsForm((error) {
+        if (error != null) { adStatus = 'Privacy choices are unavailable. Please try again.'; _emit(); }
+        _consentRequest = null;
+      });
+    }
   }
 
   @override

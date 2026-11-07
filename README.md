@@ -53,3 +53,7 @@ Catalog IDs such as `skin:pixel` are stable ownership IDs, separate from display
 
 ## Version 1.9
 Journey now continues beyond the original 30 stages with generated worlds. Daily activities award claimable coins. Five regenerating Journey lives can be refilled with coins. Optional Google Play coin packs and AdMob rewarded lives are integrated but disabled pending owner setup; see [MONETIZATION_SETUP.md](MONETIZATION_SETUP.md) for activation and backend requirements.
+
+
+## Version 1.9.1: rewarded-ad testing
+The GitHub debug APK now enables Google sample rewarded ads. Enter a Journey stage, then open Rewards and choose Watch test ad to earn one life upon rewarded completion. Test ads generate no publisher revenue. Publisher identifiers are stored in config/admob.production.json for later release activation; the release bundle keeps ads disabled. Real-money purchases remain disabled. See MONETIZATION_SETUP.md for the remaining activation steps.

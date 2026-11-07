@@ -30,3 +30,14 @@ Create an Android app and rewarded unit in AdMob. Set `ADMOB_APP_ID` in the buil
 The SDK requests consent information and shows the required UMP consent form before requesting an ad. Configure privacy messages in AdMob. Rewards includes an Ad privacy choices entry point. One life is granted only from `onUserEarnedReward`; closing early, failure and no-fill grant nothing. The player explicitly chooses each ad. Consider server-side verification for fraud resistance before launch.
 
 Update the public privacy policy, Play Data safety, ads declaration and target audience settings to match the actual configured services, and retest native alignment after SDK updates. Update the GitHub workflows with the appropriate build-time settings only when ready to activate. Never commit payment credentials or service-account keys.
+
+
+## AdMob configuration added on 8 November 2026
+
+Publisher identifiers are saved in `config/admob.production.json`. The APK workflow uses `ADS_TEST_MODE=true`, which always selects Google's sample rewarded unit and the branding script's sample App ID. The app labels the action "Watch test ad"; test impressions do not generate publisher earnings. The release bundle workflow remains ad-disabled.
+
+For live activation, first complete account/app readiness, privacy messaging, store disclosures and app-ads.txt setup. In a release build workflow, read ADMOB_APP_ID from config/admob.production.json into the environment before configure_branding.py, and pass `--dart-define-from-file=config/admob.production.json` to flutter build. The App ID cannot be supplied only as a Dart define; it must also be written to AndroidManifest.xml. Do not change the test APK workflow to request live ads during development.
+
+The sample-ad debug mode does not request production consent forms; it cannot select a live ad unit. Production mode updates UMP at launch, checks canRequestAds before loading, and displays the privacy options control when required. Payment activation and its secure backend remain separate unfinished work.
+
+Phone test: enter Journey to reserve a life; open Rewards; tap Watch test ad; complete the rewarded action; confirm one life is added (up to five). Close another ad early and check no life is awarded. A real device/network test is still required; unit tests and APK compilation cannot confirm ad delivery on a phone.

@@ -2,7 +2,7 @@
 
 ## About this policy
 
-T-BLOCK is developed by somsubhrasihi-arch. This policy covers T-BLOCK version 1.9.0, including Classic, Journey, Sprint, Daily Challenge, practice and the earned-coin shop. Last updated: 8 November 2026.
+T-BLOCK is developed by somsubhrasihi-arch. This policy covers T-BLOCK version 1.9.1, including Classic, Journey, Sprint, Daily Challenge, practice and the earned-coin shop. Last updated: 8 November 2026.
 
 ## Information stored on your device
 
@@ -10,7 +10,7 @@ The game stores settings, scores, unfinished games, Journey stars, achievements,
 
 ## Collection and sharing
 
-This release does not send your gameplay, scores, coin balance or saved progress to a T-BLOCK server. The default build has no active advertising, analytics or real-money purchases. Optional integrations for Google Play Billing and AdMob are disabled until configured. If enabled in a future release, Google handles payment details and advertising data under its policies; the developer must publish an updated policy before activation. Music and sound effects are bundled for offline play. We do not sell your information.
+This release does not send your gameplay, scores, coin balance or saved progress to a T-BLOCK server. Debug APKs can show optional Google AdMob test ads for extra lives. Test ads do not earn advertising revenue. Requesting an ad connects to Google, whose SDK may process device identifiers, IP address, diagnostic data and ad interactions under Google policies. Google privacy information is available at https://policies.google.com/privacy. Release builds keep advertising disabled unless configured. Real-money purchases and developer analytics remain disabled. Music and sound effects are bundled for offline play. We do not sell your information.
 
 ## Links and support
 
@@ -22,7 +22,7 @@ Local game data stays until you clear app storage or uninstall the game. Recover
 
 ## Your choices
 
-You can change audio, vibration, controls and motion settings in the game. You can play without creating an account. To remove local game data, use Android Settings > Apps > T-BLOCK > Storage > Clear storage, or uninstall the app. Check Android backup settings if you also want to remove system-managed backups.
+You can change audio, vibration, controls and motion settings in the game. Watching ads is optional. You can instead wait for free Journey lives, refill with earned coins or play other modes. When production ads are configured, consent messages and an Ad privacy choices control are provided where required. You can play without creating an account. To remove local game data, use Android Settings > Apps > T-BLOCK > Storage > Clear storage, or uninstall the app. Check Android backup settings if you also want to remove system-managed backups.
 
 ## Contact and changes
 
