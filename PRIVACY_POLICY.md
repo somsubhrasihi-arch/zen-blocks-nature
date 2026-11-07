@@ -2,7 +2,7 @@
 
 ## About this policy
 
-T-BLOCK is developed by somsubhrasihi-arch. This policy covers T-BLOCK version 1.10.0, including Classic, Journey, Sprint, Daily Challenge, practice and the earned-coin shop. Last updated: 8 November 2026.
+T-BLOCK is developed by somsubhrasihi-arch. This policy covers T-BLOCK version 1.11.0, including Classic, Journey, Sprint, Daily Challenge, practice and the earned-coin shop. Last updated: 8 November 2026.
 
 ## Information stored on your device
 

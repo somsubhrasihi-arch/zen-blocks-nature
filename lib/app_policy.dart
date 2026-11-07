@@ -1,4 +1,4 @@
-const appVersion = '1.10.0';
+const appVersion = '1.11.0';
 const privacyPolicyUrl = 'https://github.com/somsubhrasihi-arch/zen-blocks-nature/blob/main/PRIVACY_POLICY.md';
 const supportUrl = 'https://github.com/somsubhrasihi-arch/zen-blocks-nature/issues';
 
@@ -7,7 +7,7 @@ class PolicySection {
   final String title, body;
 }
 const privacySections = [
-  PolicySection("About this policy", "T-BLOCK is developed by somsubhrasihi-arch. This policy covers T-BLOCK version 1.10.0, including Classic, Journey, Sprint, Daily Challenge, practice and the earned-coin shop. Last updated: 8 November 2026."),
+  PolicySection("About this policy", "T-BLOCK is developed by somsubhrasihi-arch. This policy covers T-BLOCK version 1.11.0, including Classic, Journey, Sprint, Daily Challenge, practice and the earned-coin shop. Last updated: 8 November 2026."),
   PolicySection("Information stored on your device", "The game stores settings, scores, unfinished games, Journey stars, achievements, Sprint records, Daily Challenge history, Block Coins, daily activity claims, Journey lives, purchase delivery receipts, weekly goals, visit stamps, recent Daily Challenge records and cosmetic ownership on your device. Local recovery copies help restore a damaged save record. Practice does not award coins or replace your saved game."),
   PolicySection("Collection and sharing", "This release does not send your gameplay, scores, coin balance or saved progress to a T-BLOCK server. Debug APKs can show optional Google AdMob test ads for extra lives. Test ads do not earn advertising revenue. Requesting an ad connects to Google, whose SDK may process device identifiers, IP address, diagnostic data and ad interactions under Google policies. Sharing a friend challenge opens your device share sheet. You choose the recipient and service; only the challenge code and selected result are included. T-BLOCK does not upload contacts or provide online accounts, friend rankings or live matches in this release. Google privacy information is available at https://policies.google.com/privacy. Release builds keep advertising disabled unless configured. Real-money purchases and developer analytics remain disabled. Music and sound effects are bundled for offline play. We do not sell your information."),
   PolicySection("Links and support", "Opening the public privacy policy or support page launches your browser. GitHub and your browser handle those visits under their own policies. If you choose to report an issue, the information you submit is handled through GitHub. Public issue reports are visible to others; do not include passwords, payment details or other private information."),

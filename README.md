@@ -59,5 +59,5 @@ Journey now continues beyond the original 30 stages with generated worlds. Daily
 The GitHub debug APK now enables Google sample rewarded ads. Enter a Journey stage, then open Rewards and choose Watch test ad to earn one life upon rewarded completion. Test ads generate no publisher revenue. Publisher identifiers are stored in config/admob.production.json for later release activation; the release bundle keeps ads disabled. Real-money purchases remain disabled. See MONETIZATION_SETUP.md for the remaining activation steps.
 
 
-## Version 1.10.0: quests and friend challenges
+## Version 1.11.0: quests and friend challenges
 Rotating daily focus quests, weekly missions and a fixed chest, a persistent seven-visit collection, three new rendered skins and cosmetic bundles add new goals. Optional rewarded ads offer a capped post-run 25-coin bonus or one life, with helpful failure guidance and cooldowns. Friend challenge codes and the native share sheet let players race the same Daily puzzle and share personal times. These are asynchronous manual challenges; online friend rankings and live PvP are not yet implemented. See [PLAYER_ENGAGEMENT_PLAN.md](PLAYER_ENGAGEMENT_PLAN.md) for the review, validation limits and backend roadmap.

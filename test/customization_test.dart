@@ -12,13 +12,13 @@ import 'fake_audio.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('current colors and ambient track remain defaults', () {
-    expect(paletteForId(null), neonPalette);
-    expect(paletteForId('unknown'), neonPalette);
+  test('playful palette is the default while classic palettes remain available', () {
+    expect(paletteForId(null), toyPalette);
+    expect(paletteForId('unknown'), toyPalette);
     expect(neonPalette.blocks, blockColors);
     expect(trackForId(null).asset, 'audio/aurora.mp3');
     expect(trackForId('unknown').id, 'aurora');
-    expect(gamePalettes.map((p) => p.id).toSet().length, 4);
+    expect(gamePalettes.map((p) => p.id).toSet().length, 5);
     expect(musicTracks.map((p) => p.bpm).toList(), [60, 80, 105, 135]);
   });
 

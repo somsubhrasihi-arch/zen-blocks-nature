@@ -24,8 +24,8 @@ class _ArcadeButtonState extends State<ArcadeButton> {
     final enabled = widget.onPressed != null;
     final duration = MediaQuery.disableAnimationsOf(context) ? Duration.zero : const Duration(milliseconds: 100);
     const ink = Color(0xFFFFFFFF);
-    final base = Color.lerp(widget.accent, widget.surface, widget.primary ? .08 : .24)!;
-    final radius = BorderRadius.circular(widget.label.isEmpty ? 16 : 20);
+    final base = Color.lerp(widget.accent, widget.surface, widget.primary ? .04 : .14)!;
+    final radius = BorderRadius.circular(widget.label.isEmpty ? 18 : 24);
     final icon = Icon(widget.icon, color: ink, size: widget.stacked ? 28 : 24,
       shadows: const [Shadow(color: Color(0x9908182B), offset: Offset(0, 2), blurRadius: 2)]);
     final label = Text(widget.label, maxLines: 1, overflow: TextOverflow.ellipsis,
@@ -39,8 +39,8 @@ class _ArcadeButtonState extends State<ArcadeButton> {
           duration: duration,
           transform: Matrix4.translationValues(0, _pressed ? 3 : 0, 0),
           decoration: BoxDecoration(borderRadius: radius, boxShadow: [
-            BoxShadow(color: Color.lerp(base, Colors.black, .58)!, offset: Offset(0, _pressed ? 1 : 5), blurRadius: 1),
-            BoxShadow(color: widget.accent.withValues(alpha: enabled ? .14 : 0), blurRadius: 14, spreadRadius: -3),
+            BoxShadow(color: Color.lerp(base, Colors.black, .58)!, offset: Offset(0, _pressed ? 1 : 5), blurRadius: 0),
+            BoxShadow(color: widget.accent.withValues(alpha: enabled ? .14 : 0), blurRadius: 5, spreadRadius: -3),
           ]),
           child: Material(color: Colors.transparent, borderRadius: radius,
             child: InkWell(borderRadius: radius, onTap: widget.onPressed,
@@ -53,7 +53,7 @@ class _ArcadeButtonState extends State<ArcadeButton> {
                 decoration: BoxDecoration(borderRadius: radius,
                   gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter,
                     stops: const [0, .45, 1],
-                    colors: [Color.lerp(base, Colors.white, .32)!, base, Color.lerp(base, Colors.black, .23)!]),
+                    colors: [Color.lerp(base, Colors.white, .18)!, base, Color.lerp(base, Colors.black, .12)!]),
                   border: Border.all(color: Colors.white.withValues(alpha: .42), width: 1.5)),
                 child: widget.label.isEmpty ? Center(child: icon) : widget.stacked
                   ? Column(mainAxisAlignment: MainAxisAlignment.center, children: [icon, const SizedBox(height: 3), Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: label))])
@@ -80,14 +80,8 @@ class _ButtonShine extends CustomPainter {
     final r = RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(20));
     canvas.save();
     canvas.clipRRect(r);
-    final rim = RRect.fromRectAndRadius(Rect.fromLTWH(3, 3, size.width - 6, size.height - 7), const Radius.circular(17));
-    canvas.drawRRect(rim, Paint()..style = PaintingStyle.stroke..strokeWidth = 1.5
-      ..shader = const LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter,
-        colors: [Color(0x88FFFFFF), Color(0x00FFFFFF), Color(0x44FFFFFF)],
-        stops: [0, .5, 1]).createShader(Offset.zero & size));
-    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(9, 5, (size.width * .32).clamp(8, 54).toDouble(), 4), const Radius.circular(3)),
-      Paint()..color = Colors.white.withValues(alpha: .38));
-    canvas.drawOval(Rect.fromLTWH(size.width - 13, 7, 5, 8), Paint()..color = Colors.white.withValues(alpha: .48));
+    canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(10, 6, size.width - 20, 8), const Radius.circular(8)),
+      Paint()..color = Colors.white.withValues(alpha: .16));
     canvas.restore();
   }
   @override

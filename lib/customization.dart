@@ -46,7 +46,15 @@ const neonPalette = GamePalette(id: 'neon', name: 'Neon Aurora',
   blocks: [Color(0xFF00DFFF), Color(0xFFFFC247), Color(0xFFE250FF), Color(0xFF00F2B2),
     Color(0xFFFF648F), Color(0xFF598BFF), Color(0xFFAB72FF)]);
 
-const gamePalettes = [neonPalette,
+const toyPalette = GamePalette(id: 'toy', name: 'Block Buddies',
+  background: [Color(0xFF67419C), Color(0xFF58358B), Color(0xFF422668)],
+  panel: Color(0xFF482967), control: Color(0xFF573779), accent: Color(0xFFF073B0),
+  muted: Color(0xFFE4D7EF), grid: Color(0xFF54436E), board: Color(0xFF251B3E), overlay: Color(0xF0251B3E),
+  stats: [Color(0xFF694492), Color(0xFF4A2D70)],
+  blocks: [Color(0xFF48CAD1), Color(0xFFFFC44D), Color(0xFFC27DE7), Color(0xFF7ED998),
+    Color(0xFFF487B1), Color(0xFF77A7EE), Color(0xFFFFAA71)]);
+
+const gamePalettes = [toyPalette, neonPalette,
   GamePalette(id: 'forest', name: 'Forest Calm',
     background: [Color(0xFF061D19), Color(0xFF123B2E), Color(0xFF091E1B)],
     panel: Color(0xFF153D31), control: Color(0xFF1C4B3D), accent: Color(0xFF8EE6B7),
@@ -71,4 +79,4 @@ const gamePalettes = [neonPalette,
 ];
 
 GamePalette paletteForId(String? id) => gamePalettes.firstWhere((theme) => theme.id == id,
-  orElse: () => neonPalette);
+  orElse: () => toyPalette);

@@ -167,6 +167,7 @@ void main() {
     addTearDown(()=>tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(RepaintBoundary(key:captureKey,child:ZenBlocksApp(audio:GameAudio(backend:FakeAudioBackend()))));
     await tester.pump();await tester.pump();
+    await tester.tap(find.text('Challenges'));await tester.pump();
     await tester.tap(find.text('Sprint'));await tester.pump();await tester.pump(const Duration(milliseconds:500));
     await capture(tester,'12-sprint-intro');
     await tester.tap(find.text('Start Sprint'));await tester.pump();await tester.pump(const Duration(milliseconds:700));await tester.pump();
@@ -178,6 +179,7 @@ void main() {
     expect(state.game.elapsedMilliseconds,elapsed);
     await tester.tap(find.text('Continue'));await tester.pump();expect(state.game.mode,PlayMode.sprint);
     await tester.tap(find.byTooltip('Pause'));await tester.pump();await tester.tap(find.text('Home'));await tester.pump();
+    await tester.tap(find.text('Challenges'));await tester.pump();
     await tester.ensureVisible(find.text('Daily Challenge'));await tester.tap(find.text('Daily Challenge'));
     await tester.pump();await tester.pump(const Duration(milliseconds:500));
     await capture(tester,'14-daily-intro');
@@ -194,7 +196,8 @@ void main() {
     expect(state.progress.data.dailyWins,1);
     await capture(tester,'16-daily-complete');
     await tester.ensureVisible(find.text('Home'));await tester.tap(find.text('Home'));await tester.pump();
-    await tester.ensureVisible(find.text('Sprint'));await tester.tap(find.text('Sprint'));
+    await tester.tap(find.text('Challenges'));await tester.pump();await tester.ensureVisible(find.text('Sprint'));
+    await tester.tap(find.text('Sprint'));
     await tester.pump();await tester.pump(const Duration(milliseconds:500));
     await tester.ensureVisible(find.text('Start Sprint'));await tester.tap(find.text('Start Sprint'));
     await tester.pump();await tester.pump(const Duration(milliseconds:700));await tester.pump();
