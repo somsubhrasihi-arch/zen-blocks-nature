@@ -1,7 +1,7 @@
 name: zen_blocks
 description: "T-BLOCK: a falling-block puzzle with Journey, rewards and collectible styles."
 publish_to: none
-version: 1.7.0+10
+version: 1.8.0+11
 environment:
   sdk: '>=3.3.0 <4.0.0'
 dependencies:
@@ -9,6 +9,7 @@ dependencies:
     sdk: flutter
   shared_preferences: ^2.3.2
   audioplayers: ^6.8.1
+  url_launcher: ^6.3.3
 dev_dependencies:
   flutter_test:
     sdk: flutter

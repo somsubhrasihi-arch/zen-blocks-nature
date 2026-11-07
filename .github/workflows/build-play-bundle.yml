@@ -36,6 +36,7 @@ jobs:
         run: python tools/configure_release.py --signed "$SIGN_RELEASE"
       - name: Install dependencies and run tests
         run: |
+          python -m unittest discover -s tools -p '*_test.py'
           flutter pub get
           rm -f test/widget_test.dart
           flutter test
@@ -45,6 +46,14 @@ jobs:
           ZEN_UPLOAD_KEY_ALIAS: ${{ secrets.ZEN_UPLOAD_KEY_ALIAS }}
           ZEN_UPLOAD_KEY_PASSWORD: ${{ secrets.ZEN_UPLOAD_KEY_PASSWORD }}
         run: flutter build appbundle --release
+      - name: Check 16 KB native-library alignment
+        run: python tools/check_native_alignment.py build/app/outputs/bundle/release/app-release.aab
+      - name: Upload release validation report
+        uses: actions/upload-artifact@v4
+        with:
+          name: T-BLOCK-Release-Checks
+          path: build/release-checks/*.json
+          retention-days: 14
       - name: Verify bundle signing state
         run: |
           python - <<'PY'

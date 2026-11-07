@@ -2,7 +2,15 @@
 
 T-BLOCK is an offline falling-block puzzle game for Android.
 
-## v1.7.0: Player-experience improvements
+## v1.8.0: Launch preparation
+
+- Optional hands-on practice teaches moving, rotating and clearing a row without changing an existing save or wallet.
+- Game and reward records have local recovery copies. A damaged primary record can recover its last valid balance, ownership and payout receipts together. These copies are not cloud sync or protection against clearing/uninstalling.
+- Settings includes About & privacy, offline privacy text, support links and open-source licences.
+- Both Android workflows use the same pinned Flutter version. The release job checks 64-bit native ELF alignment and publishes a validation report.
+- See [PLAY_STORE_RELEASE.md](PLAY_STORE_RELEASE.md), [PLAY_STORE_LISTING.md](PLAY_STORE_LISTING.md) and [PRIVACY_POLICY.md](PRIVACY_POLICY.md).
+
+## Player-experience improvements
 
 See [UX_REVIEW.md](UX_REVIEW.md) for findings and implemented changes. This release adds working board gestures, pause-on-settings, clearer mode descriptions and wallet visibility, Journey shortcuts and world browsing, free cosmetic previews and shop filters, atomic unlock-and-equip, quieter result summaries and reduced-motion support.
 

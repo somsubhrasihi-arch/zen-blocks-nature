@@ -87,15 +87,36 @@ class ProgressStore extends ChangeNotifier {
   ProgressStore({DateTime Function()? utcNow}) : _utcNow = utcNow ?? DateTime.now;
   final DateTime Function() _utcNow;
   static const key = 'tblock.progress.v1';
+  static const backupKey = '$key.backup';
+  bool recoveredFromBackup = false;
   PlayerProgress data = PlayerProgress();
   Future<void> _writes = Future.value();
   Future<void>? _load;
   bool _disposed = false;
   Future<void> load() => _load ??= _loadData();
+  PlayerProgress? _decode(String? source) {
+    if (source == null) return null;
+    try {
+      final raw = jsonDecode(source);
+      if (raw is! Map || raw['version'] != 1 || raw['coins'] is! int || raw['coins'] < 0 ||
+          raw['stars'] is! Map || raw['owned'] is! List || raw['earned'] is! List || raw['settled'] is! List) return null;
+      return PlayerProgress.fromJson(raw);
+    } catch (_) { return null; }
+  }
   Future<void> _loadData() async {
     final prefs = await SharedPreferences.getInstance();
-    try { data = PlayerProgress.fromJson(jsonDecode(prefs.getString(key) ?? 'null')); }
-    catch (_) { data = PlayerProgress(); }
+    final primary = _decode(prefs.getString(key));
+    if (primary != null) {
+      data = primary;
+      try { await prefs.setString(backupKey, jsonEncode(primary.toJson())); } catch (_) {}
+      return;
+    }
+    final backup = _decode(prefs.getString(backupKey));
+    if (backup != null) {
+      data = backup; recoveredFromBackup = true;
+      // Repair the primary without changing the balance or its reward receipts.
+      try { await prefs.setString(key, jsonEncode(backup.toJson())); } catch (_) {}
+    } else { data = PlayerProgress(); }
   }
   Future<T> _transaction<T>(T Function(PlayerProgress) action) {
     final result = _writes.catchError((_) {}).then((_) async {
@@ -103,8 +124,12 @@ class ProgressStore extends ChangeNotifier {
       final next = PlayerProgress.fromJson(data.toJson());
       final value = action(next);
       final prefs = await SharedPreferences.getInstance();
-      if (!await prefs.setString(key, jsonEncode(next.toJson()))) throw StateError('Progress could not be saved');
+      final encoded = jsonEncode(next.toJson());
+      if (!await prefs.setString(key, encoded)) throw StateError('Progress could not be saved');
       data = next;
+      // The primary commit is authoritative even if a recovery-copy write fails.
+      try { await prefs.setString(backupKey, encoded); } catch (_) {}
+
       if (!_disposed) notifyListeners();
       return value;
     });

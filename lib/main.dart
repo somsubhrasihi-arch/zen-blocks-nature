@@ -19,6 +19,9 @@ import 'run_clock.dart';
 import 'board_touch.dart';
 import 'clear_effect.dart';
 export 'clear_effect.dart';
+import 'practice_screen.dart';
+import 'app_info_screen.dart';
+import 'app_policy.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -67,6 +70,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   bool joystickEnabled = true;
   bool reduceMotion = false, _systemReduceMotion = false;
   bool _rewardDetailsExpanded = false;
+  bool _practiceCompleted = false;
+  bool _saveErrorShown = false;
   bool get _motionAllowed => !reduceMotion && !_systemReduceMotion;
   final ZenGame game = ZenGame();
   late final GameAudio audio;
@@ -157,6 +162,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       vibrationEnabled = prefs.getBool('vibrationEnabled') ?? true;
       effectsEnabled = prefs.getBool('effectsEnabled') ?? true;
       reduceMotion = prefs.getBool('reduceMotion') ?? false;
+      _practiceCompleted = prefs.getBool('practiceCompleted') ?? false;
       joystickEnabled = prefs.getBool('joystickEnabled') ?? true;
       musicVolume = (prefs.getDouble('musicVolume') ?? .28).clamp(0.0, 1.0).toDouble();
       effectsVolume = (prefs.getDouble('effectsVolume') ?? .8).clamp(0.0, 1.0).toDouble();
@@ -166,6 +172,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     });
     _syncAnimations();
     _syncAudio();
+    if (progress.recoveredFromBackup || sessions.recoveredFromBackup) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Your progress was restored from a local recovery copy.')));
+    }
   }
 
   Future<void> _saveSettings() async {
@@ -247,11 +256,17 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     if (vibrationEnabled) HapticFeedback.selectionClick();
   }
 
-  Future<void> _persistNow() {
+  Future<void> _persistNow() async {
     _saveDebounce?.cancel();
-    if (_loading) return Future.value();
+    if (_loading) return;
     _savedState = game.saveState();
-    return sessions.save(_savedState);
+    try { await sessions.save(_savedState); _saveErrorShown = false; }
+    catch (_) {
+      if (mounted && !_saveErrorShown) {
+        _saveErrorShown = true;
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text('Your game could not be saved. Free some device storage and try again.')));
+      }
+    }
   }
 
   Future<void> _startNewGame({bool confirm = true, JourneyStage? journeyStage, PlayMode playMode = PlayMode.classic, String? dailyDay}) async {
@@ -314,6 +329,22 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
         value: value, onChanged: enabled ? onChanged : null, onChangeEnd: (_) => _saveSettings())],
   );
 
+  Future<void> _openPractice() async {
+    if (game.canMove) game.togglePause();
+    final completed = await Navigator.of(context).push<bool>(MaterialPageRoute(builder: (_) => Theme(data: _themeData,
+      child: PracticeScreen(palette: _palette, skin: progress.data.skin))));
+    if (completed == true) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('practiceCompleted', true);
+      if (mounted) setState(() => _practiceCompleted = true);
+    }
+  }
+
+  void _showAppInfo() {
+    if (game.canMove) game.togglePause();
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => Theme(data:_themeData,child:AppInfoScreen(palette:_palette))));
+  }
+
   void _showHowToPlay() => showModalBottomSheet<void>(context: context, showDragHandle: true,
     useSafeArea: true, isScrollControlled: true, backgroundColor: _palette.panel,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
@@ -322,6 +353,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
         mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('How to play', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
           SizedBox(height: 18),
+          SizedBox(width: double.infinity, child: _button('Try guided practice', Icons.school_rounded, () {
+            Navigator.pop(context); _openPractice();
+          }, primary: true)), SizedBox(height: 18),
           _helpRow(Icons.view_stream_rounded, 'Clear the rows', 'Fill a horizontal row. Every 10 rows increases the speed.'),
           _helpRow(Icons.timer_rounded, 'Pick your pace', 'Sprint races to 40 lines. Daily Challenge brings a new seeded puzzle at 00:00 UTC, with one reward per day and streak bonuses.'),
           _helpRow(Icons.route_rounded, 'Take the Journey', 'Complete stage objectives. Use fewer blocks to earn up to three stars and unlock new worlds.'),
@@ -365,6 +399,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
           _homeMetric('BLOCK COINS', '${progress.data.coins}', Icons.monetization_on_rounded)])),
       SizedBox(height: 24),
       if (_loading) Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator()),
+      if (!_loading && !_practiceCompleted) ...[
+        Row(children: [Expanded(child: Text('New here? Learn by playing.', style: TextStyle(color:_palette.muted,fontSize:12))),
+          SizedBox(width:8), SizedBox(width:100,child:_button('Practice',Icons.school_rounded,_openPractice,height:44))]),
+        SizedBox(height:12),
+      ],
       if (_savedState != null) ...[
         Text('${_savedState!['stageId'] != null ? 'Journey · Stage ${_savedState!["stageId"]}' : _savedState!['mode'] == 'sprint' ? 'Sprint' : _savedState!['mode'] == 'daily' ? 'Daily Challenge' : 'Classic'}  •  Score ${_savedState!["score"]}', style: TextStyle(color: _palette.muted, fontSize: 13)),
         SizedBox(height: 12),
@@ -390,7 +429,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
         Expanded(child: _button('How to play', Icons.sports_esports_rounded, _showHowToPlay, height: 50)),
         SizedBox(width: 10), Expanded(child: Tooltip(message: 'Settings', child: _button('Settings', Icons.tune_rounded, _showSettings, height: 50))),
       ]),
-      SizedBox(height: 22), Text('v1.7.0', style: TextStyle(color: _palette.muted.withValues(alpha: .65), fontSize: 10, letterSpacing: 1)),
+      SizedBox(height: 22), Text('v$appVersion', style: TextStyle(color: _palette.muted.withValues(alpha: .65), fontSize: 10, letterSpacing: 1)),
     ])),
   )));
 
@@ -594,7 +633,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
                   update(() => vibrationEnabled = v); setState(() {}); _saveSettings();
                 }),
               ]),
-              Center(child: Text('T-BLOCK • 1.7.0', style: TextStyle(color: _palette.muted.withValues(alpha: .65), fontSize: 10, letterSpacing: 1))),
+              SizedBox(width:double.infinity,child:_button('About & privacy',Icons.info_outline_rounded,(){Navigator.pop(context);_showAppInfo();},height:50)),
+              SizedBox(height:12),
+              Center(child: Text('T-BLOCK • $appVersion', style: TextStyle(color: _palette.muted.withValues(alpha: .65), fontSize: 10, letterSpacing: 1))),
             ])),
           ]),
         )),
