@@ -1,6 +1,36 @@
 import 'package:flutter/material.dart';
 
 void paintCosmeticBlock(Canvas canvas, Rect rect, Color color, {String skin = 'glass'}) {
+  if (skin == 'holo' || skin == 'circuit' || skin == 'crystal') {
+    final box = rect.deflate(1.4);
+    final light = Color.lerp(color, Colors.white, .65)!;
+    canvas.drawRRect(RRect.fromRectAndRadius(box, const Radius.circular(3)), Paint()..color = Color.lerp(color, Colors.black, .48)!);
+    if (skin == 'holo') {
+      final panel = Path()..moveTo(box.left, box.top)..lineTo(box.right, box.top)..lineTo(box.left, box.bottom)..close();
+      canvas.drawPath(panel, Paint()..color = color);
+      final facet = Path()..moveTo(box.right, box.top)..lineTo(box.right, box.bottom)..lineTo(box.center.dx, box.bottom)..close();
+      canvas.drawPath(facet, Paint()..color = light.withValues(alpha: .55));
+      canvas.drawLine(box.topRight, box.bottomLeft, Paint()..color = light..strokeWidth = 1.2);
+    } else if (skin == 'circuit') {
+      final path = Path()..moveTo(box.left + box.width * .15, box.top + box.height * .25)
+        ..lineTo(box.center.dx, box.top + box.height * .25)..lineTo(box.center.dx, box.bottom - box.height * .2)
+        ..lineTo(box.right - box.width * .15, box.bottom - box.height * .2);
+      canvas.drawPath(path, Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = 1.8);
+      for (final point in [Offset(box.left + box.width * .15, box.top + box.height * .25), Offset(box.right - box.width * .15, box.bottom - box.height * .2)]) {
+        canvas.drawCircle(point, box.shortestSide * .075, Paint()..color = light);
+      }
+      canvas.drawCircle(box.center, box.shortestSide * .12, Paint()..color = light);
+    } else {
+      final diamond = Path()..moveTo(box.center.dx, box.top + box.height * .08)..lineTo(box.right - box.width * .08, box.center.dy)
+        ..lineTo(box.center.dx, box.bottom - box.height * .08)..lineTo(box.left + box.width * .08, box.center.dy)..close();
+      canvas.drawPath(diamond, Paint()..color = color);
+      final top = Path()..moveTo(box.center.dx, box.top + box.height * .08)..lineTo(box.right - box.width * .08, box.center.dy)..lineTo(box.center.dx, box.center.dy)..close();
+      canvas.drawPath(top, Paint()..color = light);
+      canvas.drawPath(diamond, Paint()..color = light..style = PaintingStyle.stroke..strokeWidth = 1);
+    }
+    canvas.drawRRect(RRect.fromRectAndRadius(box, const Radius.circular(3)), Paint()..color = light..style = PaintingStyle.stroke..strokeWidth = 1);
+    return;
+  }
   if (skin == 'pixel') {
     canvas.drawRect(rect.deflate(1), Paint()..color = Color.lerp(color, Colors.black, .22)!);
     canvas.drawRect(Rect.fromLTWH(rect.left + 2, rect.top + 2, rect.width - 4, rect.height * .2), Paint()..color = Color.lerp(color, Colors.white, .65)!);

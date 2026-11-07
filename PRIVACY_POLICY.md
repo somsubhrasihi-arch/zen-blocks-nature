@@ -2,15 +2,15 @@
 
 ## About this policy
 
-T-BLOCK is developed by somsubhrasihi-arch. This policy covers T-BLOCK version 1.9.2, including Classic, Journey, Sprint, Daily Challenge, practice and the earned-coin shop. Last updated: 8 November 2026.
+T-BLOCK is developed by somsubhrasihi-arch. This policy covers T-BLOCK version 1.10.0, including Classic, Journey, Sprint, Daily Challenge, practice and the earned-coin shop. Last updated: 8 November 2026.
 
 ## Information stored on your device
 
-The game stores settings, scores, unfinished games, Journey stars, achievements, Sprint records, Daily Challenge history, Block Coins, daily activity claims, Journey lives, purchase delivery receipts and cosmetic ownership on your device. Local recovery copies help restore a damaged save record. Practice does not award coins or replace your saved game.
+The game stores settings, scores, unfinished games, Journey stars, achievements, Sprint records, Daily Challenge history, Block Coins, daily activity claims, Journey lives, purchase delivery receipts, weekly goals, visit stamps, recent Daily Challenge records and cosmetic ownership on your device. Local recovery copies help restore a damaged save record. Practice does not award coins or replace your saved game.
 
 ## Collection and sharing
 
-This release does not send your gameplay, scores, coin balance or saved progress to a T-BLOCK server. Debug APKs can show optional Google AdMob test ads for extra lives. Test ads do not earn advertising revenue. Requesting an ad connects to Google, whose SDK may process device identifiers, IP address, diagnostic data and ad interactions under Google policies. Google privacy information is available at https://policies.google.com/privacy. Release builds keep advertising disabled unless configured. Real-money purchases and developer analytics remain disabled. Music and sound effects are bundled for offline play. We do not sell your information.
+This release does not send your gameplay, scores, coin balance or saved progress to a T-BLOCK server. Debug APKs can show optional Google AdMob test ads for extra lives. Test ads do not earn advertising revenue. Requesting an ad connects to Google, whose SDK may process device identifiers, IP address, diagnostic data and ad interactions under Google policies. Sharing a friend challenge opens your device share sheet. You choose the recipient and service; only the challenge code and selected result are included. T-BLOCK does not upload contacts or provide online accounts, friend rankings or live matches in this release. Google privacy information is available at https://policies.google.com/privacy. Release builds keep advertising disabled unless configured. Real-money purchases and developer analytics remain disabled. Music and sound effects are bundled for offline play. We do not sell your information.
 
 ## Links and support
 

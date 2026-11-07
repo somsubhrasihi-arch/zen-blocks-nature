@@ -90,6 +90,9 @@ const shopItems = [
   ShopItem('skin:pixel', 'Pixel Pop', 'Crisp corners. Pure arcade nostalgia.', CosmeticKind.skin, 120),
   ShopItem('skin:jelly', 'Jelly Gems', 'Soft curves and a candy-bright shine.', CosmeticKind.skin, 200),
   ShopItem('skin:metal', 'Chrome Club', 'Brushed-metal blocks with bright bevels.', CosmeticKind.skin, 300),
+  ShopItem('skin:holo', 'Holo Prism', 'Diagonal holographic panels in your block colors.', CosmeticKind.skin, 900),
+  ShopItem('skin:circuit', 'Circuit Core', 'Glowing circuit paths and bright connection nodes.', CosmeticKind.skin, 1400),
+  ShopItem('skin:crystal', 'Crystal Crown', 'Faceted gemstone blocks with a diamond center.', CosmeticKind.skin, 1800),
   ShopItem('effect:sparks', 'Stardust', 'A burst of colorful sparks.', CosmeticKind.effect, 0),
   ShopItem('effect:nova', 'Nova Bloom', 'Expanding rings and drifting stars.', CosmeticKind.effect, 240),
   ShopItem('effect:lightning', 'Prism Storm', 'Electric bolts in your theme colors.', CosmeticKind.effect, 320),
@@ -117,4 +120,16 @@ const achievements = [
   Achievement('dailyFirst', 'Today’s Triumph', 'Claim your first Daily Challenge reward', 50, 1),
   Achievement('dailySeven', 'Daily Explorer', 'Complete Daily Challenges on seven different days', 150, 7),
   Achievement('streakSeven', 'Seven-Day Spark', 'Reach a seven-day Daily Challenge streak', 200, 7),
+];
+
+class ShopBundle {
+  const ShopBundle(this.id, this.name, this.items);
+  final String id, name;
+  final List<String> items;
+  int individualPrice(Set<String> owned) => items.where((id) => !owned.contains(id)).fold(0, (sum, id) => sum + itemForId(id)!.price);
+  int priceFor(Set<String> owned) => individualPrice(owned) * 4 ~/ 5;
+}
+const shopBundles = [
+  ShopBundle('pixel-party', 'Pixel Party', ['skin:pixel', 'effect:nova']),
+  ShopBundle('chrome-storm', 'Chrome Storm', ['skin:metal', 'effect:lightning']),
 ];

@@ -1,6 +1,6 @@
 # T-BLOCK launch preparation
 
-Current candidate: **1.9.2+14**. Android identity: `com.zenblocks.nature.zen_blocks`.
+Current candidate: **1.10.0+15**. Android identity: `com.zenblocks.nature.zen_blocks`.
 
 The game has Classic, ongoing Journey with generated stages, Sprint, Daily Challenge, earned coins, cosmetics, guided practice, local recovery copies, privacy information and open-source licences. It has no account system or analytics. Optional billing and advertising SDKs are integrated but disabled in default builds. See MONETIZATION_SETUP.md before activating monetization; verified billing needs an authenticated backend and authoritative wallet.
 

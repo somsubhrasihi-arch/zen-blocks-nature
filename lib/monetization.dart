@@ -8,6 +8,7 @@ import 'package:in_app_purchase/in_app_purchase.dart';
 
 import 'progress_store.dart';
 import 'ads_config.dart';
+import 'play_modes.dart';
 
 import 'package:in_app_purchase_android/in_app_purchase_android.dart';
 
@@ -22,12 +23,31 @@ class Monetization extends ChangeNotifier {
   final Future<void> Function()? _initializeAds;
   final Future<RewardedAd?> Function(String unit)? _loadAd;
   String? adDiagnostic;
+  bool hasAdFailure = false;
+  String? _activeAdUnit;
+  int _failureCount = 0;
+  DateTime? _retryAt;
+  Timer? _retryTimer;
+  Duration get retryIn {
+    if (_retryAt == null) return Duration.zero;
+    final duration = _retryAt!.difference(progress.now);
+    return duration.isNegative ? Duration.zero : duration;
+  }
+  bool get canRequestAd => !busy && retryIn == Duration.zero;
+  bool get coinAdsConfigured => configuration.coinRewardedUnit.isNotEmpty && !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  void _cooldown(int seconds) {
+    _retryAt = progress.now.add(Duration(seconds: seconds));
+    _retryTimer?.cancel();
+    _retryTimer = Timer(Duration(seconds: seconds), () { _retryAt = null; _emit(); });
+  }
+
   bool get usingTestAds => configuration.testMode;
 
   final ProgressStore progress;
   static const testAds = bool.fromEnvironment('ADS_TEST_MODE');
   static const ads = AdsConfiguration(testMode: testAds,
-    productionRewardedUnit: String.fromEnvironment('REWARDED_AD_UNIT_ID'));
+    productionRewardedUnit: String.fromEnvironment('REWARDED_AD_UNIT_ID'),
+    productionCoinUnit: String.fromEnvironment('REWARDED_COIN_AD_UNIT_ID'));
   static String get rewardedUnit => ads.rewardedUnit;
   String adStatus = 'Rewarded ads are not available in this build.';
   bool privacyOptionsRequired = false;
@@ -242,20 +262,31 @@ class Monetization extends ChangeNotifier {
     finally { accepting = false; }
   }
   void _adFailed(String stage, Object error) {
+    hasAdFailure = true;
+    _failureCount++;
+    _cooldown(_failureCount == 1 ? 15 : _failureCount == 2 ? 30 : 60);
     final sdk = error is AdError ? error : null;
     adStatus = error is TimeoutException
       ? 'The ad request timed out. Check your connection and try again.'
-      : 'The ad could not ${stage == 'Showing ad' ? 'open' : 'load'}. Please try again.';
+      : 'Ad couldn’t load. You can retry shortly or keep playing.';
     if (kDebugMode) {
       final reason = sdk == null ? '$error' : 'Code: ${sdk.code}\nDomain: ${sdk.domain}\nMessage: ${sdk.message}';
-      adDiagnostic = 'Stage: $stage\nMode: ${usingTestAds ? 'Google sample test ad' : 'Configured ad unit'}\nUnit: ${configuration.rewardedUnit}\n$reason';
+      adDiagnostic = 'Stage: $stage\nMode: ${usingTestAds ? 'Google sample test ad' : 'Configured ad unit'}\nUnit: ${_activeAdUnit ?? configuration.rewardedUnit}\n$reason';
       if (sdk != null) adStatus += ' (Error ${sdk.code})';
     }
     _emit();
   }
-  Future<bool> watchForLife() async {
-    if (!adsConfigured || busy || progress.data.livesAt(progress.now) >= 5) return false;
-    busy = true; adDiagnostic = null;
+  Future<bool> watchForLife({bool Function()? canShow}) => _watchReward(
+    unit: configuration.rewardedUnit, eligible: () => progress.canWatchLifeAd,
+    grant: progress.grantAdLife, rewardLabel: 'One life added!', canShow: canShow);
+  Future<bool> watchForRunBonus(String runId, {bool Function()? canShow}) => _watchReward(
+    unit: configuration.coinRewardedUnit,
+    eligible: () => progress.data.canClaimRunAd(runId, utcDay(progress.now)),
+    grant: () => progress.grantRunAdBonus(runId), rewardLabel: '25 bonus coins added!', canShow: canShow);
+  Future<bool> _watchReward({required String unit, required bool Function() eligible,
+    required Future<bool> Function() grant, required String rewardLabel, bool Function()? canShow}) async {
+    if (unit.isEmpty || kIsWeb || defaultTargetPlatform != TargetPlatform.android || !canRequestAd || !eligible()) return false;
+    busy = true; adDiagnostic = null; hasAdFailure = false; _activeAdUnit = unit;
     var stage = 'Initializing ad SDK';
     _emit();
     try {
@@ -270,15 +301,16 @@ class Monetization extends ChangeNotifier {
       if (_initializeAds != null) { await _initializeAds().timeout(const Duration(seconds: 20)); }
       else { await MobileAds.instance.initialize().timeout(const Duration(seconds: 20)); }
       stage = 'Loading rewarded ad';
-      final ad = await _requestRewardedAd(configuration.rewardedUnit);
-      if (ad == null || _disposed) {
+      final ad = await _requestRewardedAd(unit);
+      if (ad == null || _disposed || !eligible() || (canShow != null && !canShow())) {
         ad?.dispose();
-        if (!_disposed) _adFailed(stage, StateError('No ad returned by the SDK'));
+        if (ad == null && !_disposed) _adFailed(stage, StateError('No ad returned by the SDK'));
+        else { adStatus = 'Ad cancelled. Continue when you’re ready.'; }
         return false;
       }
       stage = 'Showing ad';
       final closed = Completer<void>();
-      Future<bool>? grant;
+      Future<bool>? delivery;
       AdError? showError;
       ad.fullScreenContentCallback = FullScreenContentCallback(
         onAdDismissedFullScreenContent: (ad) { ad.dispose(); if (!closed.isCompleted) closed.complete(); },
@@ -286,12 +318,13 @@ class Monetization extends ChangeNotifier {
           showError = error; ad.dispose(); if (!closed.isCompleted) closed.complete();
         },
       );
-      await ad.show(onUserEarnedReward: (_, reward) { grant ??= progress.grantAdLife(); });
+      await ad.show(onUserEarnedReward: (_, reward) { delivery ??= grant(); });
       await closed.future;
       if (showError != null) { _adFailed(stage, showError!); return false; }
       stage = 'Saving life reward';
-      final earned = grant != null && await grant!;
-      adStatus = earned ? 'One life added!' : 'Finish the rewarded ad to receive a life.';
+      final earned = delivery != null && await delivery!;
+      if (earned) { _failureCount = 0; _cooldown(60); }
+      adStatus = earned ? rewardLabel : 'Finish the rewarded ad to receive the reward.';
       return earned;
     } catch (error) { _adFailed(stage, error); return false; }
     finally { busy = false; _emit(); }
@@ -309,6 +342,7 @@ class Monetization extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _retryTimer?.cancel();
     _subscription?.cancel();
     super.dispose();
   }
