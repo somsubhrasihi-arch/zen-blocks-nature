@@ -324,7 +324,7 @@ void main() {
       );
       await tester.tap(find.text('Friends'));
       await tester.pumpAndSettle();
-      expect(find.text('TBD-20261108'), findsOneWidget);
+      expect(find.byWidgetPredicate((widget) => widget is SelectableText && widget.data == 'TBD-20261108'), findsOneWidget);
       await capture(tester, '26-friend-challenges');
       await tester.ensureVisible(find.byType(TextField));
       await tester.pump();
