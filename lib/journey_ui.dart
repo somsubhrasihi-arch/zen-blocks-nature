@@ -1,4 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'monetization.dart';
+import 'play_modes.dart';
 import 'arcade_ui.dart';
 import 'campaign.dart';
 import 'cosmetic_paint.dart';
@@ -7,10 +10,11 @@ import 'progress_store.dart';
 import 'cosmetic_preview.dart';
 
 class AdventureHub extends StatefulWidget {
-  const AdventureHub({super.key, required this.palette, required this.progress, required this.onStage, this.initialTab = 0, this.reduceMotion = false});
+  const AdventureHub({super.key, required this.palette, required this.progress, required this.onStage, this.monetization, this.initialTab = 0, this.reduceMotion = false});
   final GamePalette palette;
   final ProgressStore progress;
   final ValueChanged<JourneyStage> onStage;
+  final Monetization? monetization;
   final int initialTab;
   final bool reduceMotion;
   @override
@@ -20,6 +24,23 @@ class AdventureHub extends StatefulWidget {
 class _AdventureHubState extends State<AdventureHub> {
   late int tab = widget.initialTab;
   bool busy = false;
+  Timer? clock;
+  @override
+  void initState() {
+    super.initState();
+    clock = Timer.periodic(const Duration(seconds: 1), (_) { if (mounted && tab == 3) setState(() {}); });
+    widget.monetization?.addListener(changed);
+  }
+  void changed() { if (mounted) setState(() {}); }
+  @override
+  void dispose() { clock?.cancel(); widget.monetization?.removeListener(changed); super.dispose(); }
+  Future<void> perform(Future<Object?> Function() action) async {
+    if (busy) return;
+    setState(() => busy = true);
+    try { await action(); } catch (_) { message('Could not save. Please try again.'); }
+    finally { if (mounted) setState(() => busy = false); }
+  }
+
   late int selectedWorld = widget.progress.data.recommendedStage?.world ?? 0;
   String shopFilter = 'All';
   GamePalette get p => widget.palette;
@@ -73,7 +94,7 @@ class _AdventureHubState extends State<AdventureHub> {
   Widget build(BuildContext context) => AnimatedBuilder(animation: widget.progress, builder: (context, _) => Scaffold(
     backgroundColor: p.background.first,
     appBar: AppBar(backgroundColor: p.panel, leading: Padding(padding: const EdgeInsets.all(6),
-      child: ArcadeIconButton(tooltip: 'Back', icon: Icons.arrow_back_rounded, onPressed: () => Navigator.pop(context), palette: p)), title: Text(['Journey', 'Block Shop', 'Achievements'][tab]),
+      child: ArcadeIconButton(tooltip: 'Back', icon: Icons.arrow_back_rounded, onPressed: () => Navigator.pop(context), palette: p)), title: Text(['Journey', 'Block Shop', 'Achievements', 'Daily rewards & lives'][tab]),
       actions: [Padding(padding: const EdgeInsets.only(right: 16), child: Center(child: Row(children: [
         Icon(Icons.monetization_on_rounded, color: p.blocks[1], size: 22), const SizedBox(width: 5),
         Text('${data.coins}', style: const TextStyle(fontWeight: FontWeight.w800)),
@@ -83,15 +104,16 @@ class _AdventureHubState extends State<AdventureHub> {
         NavigationDestination(icon: Icon(Icons.route_rounded), label: 'Journey'),
         NavigationDestination(icon: Icon(Icons.shopping_bag_rounded), label: 'Shop'),
         NavigationDestination(icon: Icon(Icons.emoji_events_rounded), label: 'Achievements'),
+        NavigationDestination(icon: Icon(Icons.card_giftcard_rounded), label: 'Rewards'),
       ]),
-    body: SafeArea(child: ListView(key: ValueKey('hub-$tab-$selectedWorld'), padding: const EdgeInsets.all(16), children: tab == 0 ? journey() : tab == 1 ? shop() : trophies())),
+    body: SafeArea(child: ListView(key: ValueKey('hub-$tab-$selectedWorld'), padding: const EdgeInsets.all(16), children: tab == 0 ? journey() : tab == 1 ? shop() : tab == 2 ? trophies() : rewards())),
   ));
 
   List<Widget> journey() => [
     card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text('Your next adventure', style: TextStyle(color: p.accent, fontSize: 22, fontWeight: FontWeight.w800)),
-      const SizedBox(height: 8), Text('${data.stars.length}/30 stages complete  •  ${data.totalStars}/90 stars'),
-      const SizedBox(height: 12), LinearProgressIndicator(value: data.totalStars/90, color: p.blocks[1], backgroundColor: p.control),
+      const SizedBox(height: 8), Text('${data.stars.length} stages complete  •  ${data.totalStars} stars'),
+      const SizedBox(height: 12), LinearProgressIndicator(value: (data.stars.keys.where((id) => (id - 1) ~/ 10 == selectedWorld).length / 10).clamp(0, 1), color: p.blocks[1], backgroundColor: p.control),
       const SizedBox(height: 12), Text('Complete objectives to earn coins. Use fewer blocks for more stars.', style: TextStyle(color: p.muted, height: 1.4)),
       if (data.recommendedStage != null) ...[const SizedBox(height: 12),
         Text('Up next: Stage ${data.recommendedStage!.id} · ${data.recommendedStage!.name}', style: TextStyle(color: p.accent, fontWeight: FontWeight.w700)),
@@ -101,15 +123,15 @@ class _AdventureHubState extends State<AdventureHub> {
       ],
     ])),
     Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Wrap(spacing: 6, runSpacing: 6, children: [
-      for (var i=0; i<3; i++) ChoiceChip(label: Text(worldNames[i]), selected: selectedWorld == i,
+      for (final i in ({0, 1, 2, if (selectedWorld > 0) selectedWorld - 1, selectedWorld, selectedWorld + 1, data.recommendedStage?.world ?? 0}.toList()..sort())) ChoiceChip(label: Text(worldName(i)), selected: selectedWorld == i,
         selectedColor: p.accent.withValues(alpha: .25), onSelected: (_) => setState(() => selectedWorld=i)),
     ])),
     for (final world in [selectedWorld]) ...[
       Padding(padding: const EdgeInsets.fromLTRB(4, 16, 4, 12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('WORLD ${world + 1} · ${worldNames[world]}', style: TextStyle(color: p.accent, fontWeight: FontWeight.w800, letterSpacing: .8)),
-        const SizedBox(height: 4), Text('${worldDescriptions[world]}${world == 0 ? '' : ' · ${[0,12,28][world]} stars to enter'}', style: TextStyle(color: p.muted, fontSize: 12)),
+        Text('WORLD ${world + 1} · ${worldName(world)}', style: TextStyle(color: p.accent, fontWeight: FontWeight.w800, letterSpacing: .8)),
+        const SizedBox(height: 4), Text('${world < 3 ? worldDescriptions[world] : 'The adventure continues'}${world == 0 ? '' : ' · ${world < 3 ? [0,12,28][world] : 28} stars to enter'}', style: TextStyle(color: p.muted, fontSize: 12)),
       ])),
-      for (final stage in journeyStages.where((s) => s.world == world)) stageCard(stage),
+      for (final stage in stagesInWorld(world)) stageCard(stage),
     ],
   ];
   Widget stageCard(JourneyStage stage) {
@@ -131,6 +153,7 @@ class _AdventureHubState extends State<AdventureHub> {
     ]));
   }
   List<Widget> shop() => [
+    ...storeCards(),
     card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text('Make it yours', style: TextStyle(color: p.accent, fontSize: 22, fontWeight: FontWeight.w800)),
       const SizedBox(height: 8), Text('Preview a look. Unlock it with Block Coins and wear it straight away.', style: TextStyle(color: p.muted, height: 1.4)),
@@ -155,6 +178,52 @@ class _AdventureHubState extends State<AdventureHub> {
     Center(child: Text('Progress and coins are saved on this device.', style: TextStyle(color: p.muted, fontSize: 11))),
     const SizedBox(height: 12),
   ];
+  List<Widget> storeCards() {
+    final service = widget.monetization;
+    return [card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('Coin packs', style: TextStyle(color: p.accent, fontSize: 22, fontWeight: FontWeight.w800)),
+      const SizedBox(height: 8), Text('Use coins for new looks or a Journey life refill. All purchases are optional.', style: TextStyle(color: p.muted)),
+      const SizedBox(height: 12),
+      for (final entry in (const {'tblock_coins_500': 500, 'tblock_coins_1500': 1500}).entries) ...[
+        button('${entry.value} coins · ${service?.products[entry.key]?.price ?? 'Unavailable'}', Icons.shopping_bag_rounded,
+          service == null || service.busy || !service.products.containsKey(entry.key) ? null : () => perform(() => service.buy(service.products[entry.key]!))),
+        const SizedBox(height: 8),
+      ],
+      Text(service?.status ?? 'Purchases are not available in this build.', style: TextStyle(color: p.muted, fontSize: 12)),
+      if (service?.billingConfigured == true) ...[const SizedBox(height: 8), button('Recover pending purchase', Icons.restore_rounded,
+        busy || service!.busy ? null : () => perform(service.recover))],
+    ]))];
+  }
+  List<Widget> rewards() {
+    final now = widget.progress.now;
+    final lives = data.livesAt(now), remaining = data.nextLifeIn(now);
+    final today = utcDay(now), current = data.activityDay == today;
+    final service = widget.monetization;
+    return [
+      card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Journey lives · $lives / 5', style: TextStyle(color: p.accent, fontSize: 22, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 10), Row(children: [for (var i = 0; i < 5; i++) Padding(padding: const EdgeInsets.only(right: 8), child: Icon(i < lives ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: p.blocks[4], size: 30))]),
+        const SizedBox(height: 10), Text(lives == 5 ? 'Lives full. Your next adventure is ready.' : 'Next free life in ${remaining.inMinutes.toString().padLeft(2, '0')}:${(remaining.inSeconds % 60).toString().padLeft(2, '0')}', style: TextStyle(color: p.muted)),
+        const SizedBox(height: 8), Text('One life is reserved when you enter a stage and returned when you win. Resuming costs nothing. A restart or abandoned attempt uses that life. One free life every 30 minutes, up to 5. Other modes need no lives.', style: TextStyle(color: p.muted, fontSize: 12, height: 1.5)),
+        const SizedBox(height: 12), button('Refill to 5 · 150 coins', Icons.favorite_rounded, busy || lives == 5 || data.coins < 150 ? null : () => perform(() => widget.progress.refillWithCoins())),
+        const SizedBox(height: 8), button('Watch an ad · +1 life', Icons.ondemand_video_rounded,
+          busy || lives == 5 || service == null || !service.adsConfigured || service.busy ? null : () => perform(() => service.watchForLife())),
+        const SizedBox(height: 8), Text(service?.adsConfigured == true ? service!.status : 'Rewarded ads are not available in this build.', style: TextStyle(color: p.muted, fontSize: 12)),
+        if (service?.adsConfigured == true) TextButton(onPressed: service!.privacyOptions, child: const Text('Ad privacy choices')),
+        TextButton(onPressed: () => setState(() => tab = 1), child: const Text('Get coin packs')),
+      ])),
+      card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Daily activities', style: TextStyle(color: p.accent, fontSize: 22, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 8), Text('New rewards each day at 00:00 UTC. Claim each activity once. Practice lessons do not count.', style: TextStyle(color: p.muted, height: 1.4)),
+      ])),
+      for (final task in dailyActivities) card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(task.title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 8), Text('+${task.coins} coins${task.target == 0 ? '' : ' · ${(current ? data.activityValue(task.id) : 0).clamp(0, task.target)}/${task.target}'}', style: TextStyle(color: p.blocks[1])),
+        const SizedBox(height: 12), button(current && data.activityClaims.contains(task.id) ? 'Claimed' : 'Claim reward', Icons.card_giftcard_rounded,
+          busy || (current && data.activityClaims.contains(task.id)) || (current ? data.activityValue(task.id) : 0) < task.target ? null : () => perform(() => widget.progress.claimActivity(task.id))),
+      ])),
+    ];
+  }
   bool visible(ShopItem item) => switch (shopFilter) {
     'Owned' => data.owned.contains(item.id),
     'Affordable' => !data.owned.contains(item.id) && item.price <= data.coins,

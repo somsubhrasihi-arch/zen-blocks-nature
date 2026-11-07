@@ -16,7 +16,7 @@ T-BLOCK brings glowing blocks, colorful themes and original music to a falling-b
 
 CHOOSE YOUR CHALLENGE
 - Classic: keep your stack under control and chase your personal best.
-- Journey: explore 30 stages across three worlds, complete objectives and collect stars.
+- Journey: explore an ongoing Journey across generated worlds, complete objectives and collect stars.
 - Sprint: clear 40 lines as quickly as you can and improve your best time.
 - Daily Challenge: return for a new puzzle every day, with daily rewards and streak bonuses. Challenges reset at 00:00 UTC.
 
@@ -29,7 +29,7 @@ Earn Block Coins through gameplay and achievements. Preview block skins and clea
 PLAY AT YOUR PACE
 Pause and resume an unfinished game. Your scores, progress, coins and unlocked cosmetics are saved on your device, with local recovery copies for damaged save records. Local storage is not cloud sync: clearing app data or uninstalling can remove progress.
 
-This version includes no ads or real-money purchases. Core play, original music and cosmetic previews work offline. Opening support or the public privacy policy uses your browser.
+The default build has no active ads or real-money purchases. Optional services require separate activation; update this listing before enabling them. Core play, original music and cosmetic previews work offline. Opening support or the public privacy policy uses your browser.
 
 ## Assets and declarations to finalize
 
@@ -40,3 +40,5 @@ This version includes no ads or real-money purchases. Core play, original music 
 - Public privacy policy: https://github.com/somsubhrasihi-arch/zen-blocks-nature/blob/main/PRIVACY_POLICY.md
 
 Use T-BLOCK branding throughout. Do not imply affiliation with another puzzle-game brand.
+
+- Earn daily activity rewards and regenerate Journey lives while away. Refill lives with earned coins.

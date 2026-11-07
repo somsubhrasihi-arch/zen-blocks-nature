@@ -9,6 +9,29 @@ class PlayerProgress {
   int sprintBestMs = 0, sprintWins = 0, dailyWins = 0, dailyStreak = 0, bestDailyStreak = 0;
   String? lastDailyDay, practiceDay;
   int practiceCoins = 0;
+  int lives = 5, lifeAnchorMs = 0;
+  String? activeJourneyRun, activityDay;
+  int activityRuns = 0, activityLines = 0, activityWins = 0;
+  final Set<String> activityClaims = {}, paidReceipts = {};
+  static const lifeIntervalMs = 30 * 60 * 1000;
+  int livesAt(DateTime now) => (lives + (lifeAnchorMs == 0 ? 0 : ((now.millisecondsSinceEpoch - lifeAnchorMs) ~/ lifeIntervalMs).clamp(0, 5))).clamp(0, 5);
+  Duration nextLifeIn(DateTime now) {
+    if (livesAt(now) == 5 || lifeAnchorMs == 0) return Duration.zero;
+    final elapsed = (now.millisecondsSinceEpoch - lifeAnchorMs).clamp(0, 1 << 62);
+    return Duration(milliseconds: lifeIntervalMs - elapsed % lifeIntervalMs);
+  }
+  void refreshLives(DateTime now) {
+    final count = livesAt(now);
+    if (count == 5) { lifeAnchorMs = 0; }
+    else if (lifeAnchorMs > 0) {
+      final intervals = ((now.millisecondsSinceEpoch - lifeAnchorMs) ~/ lifeIntervalMs).clamp(0, 5);
+      lifeAnchorMs += intervals * lifeIntervalMs;
+    }
+    lives = count;
+  }
+  int activityValue(String id) => switch (id) {
+    'play' => activityRuns, 'lines' => activityLines, 'win' => activityWins, _ => 0,
+  };
   int activeDailyStreak(String day) {
     final previous = parseDay(lastDailyDay), current = parseDay(day);
     if (previous == null || current == null) return 0;
@@ -22,8 +45,14 @@ class PlayerProgress {
   final List<String> settledRuns = [];
   String skin = 'glass', effect = 'sparks';
   JourneyStage? get recommendedStage {
-    for (final stage in journeyStages) { if (unlocked(stage) && !stars.containsKey(stage.id)) return stage; }
-    for (final stage in journeyStages) { if (unlocked(stage) && (stars[stage.id] ?? 0) < 3) return stage; }
+    var id = 1;
+    while (stars.containsKey(id)) { id++; }
+    final next = stageForId(id)!;
+    if (unlocked(next)) return next;
+    for (var earlier = 1; earlier < id; earlier++) {
+      final stage = stageForId(earlier)!;
+      if (unlocked(stage) && (stars[earlier] ?? 0) < 3) return stage;
+    }
     return null;
   }
   int get totalStars => stars.values.fold(0, (a, b) => a + b);
@@ -44,6 +73,9 @@ class PlayerProgress {
     'settled': settledRuns, 'skin': skin, 'effect': effect,
     'sprintBestMs': sprintBestMs, 'sprintWins': sprintWins, 'dailyWins': dailyWins,
     'dailyStreak': dailyStreak, 'bestDailyStreak': bestDailyStreak, 'lastDailyDay': lastDailyDay,
+    'lives': lives, 'lifeAnchorMs': lifeAnchorMs, 'activeJourneyRun': activeJourneyRun,
+    'activityDay': activityDay, 'activityRuns': activityRuns, 'activityLines': activityLines,
+    'activityWins': activityWins, 'activityClaims': activityClaims.toList(), 'paidReceipts': paidReceipts.toList(),
     'practiceDay': practiceDay, 'practiceCoins': practiceCoins};
   static PlayerProgress fromJson(Object? raw) {
     final p = PlayerProgress();
@@ -54,6 +86,13 @@ class PlayerProgress {
     if (raw['lastDailyDay'] is String && parseDay(raw['lastDailyDay']) != null) p.lastDailyDay = raw['lastDailyDay'];
     if (raw['practiceDay'] is String && parseDay(raw['practiceDay']) != null) p.practiceDay = raw['practiceDay'];
     p.practiceCoins = count('practiceCoins').clamp(0, 100).toInt();
+    p.lives = raw['lives'] is int ? (raw['lives'] as int).clamp(0, 5) : 5;
+    p.lifeAnchorMs = raw['lifeAnchorMs'] is int ? (raw['lifeAnchorMs'] as int).clamp(0, 1 << 62) : 0;
+    if (raw['activeJourneyRun'] is String) p.activeJourneyRun = raw['activeJourneyRun'];
+    if (raw['activityDay'] is String && parseDay(raw['activityDay']) != null) p.activityDay = raw['activityDay'];
+    p.activityRuns = count('activityRuns'); p.activityLines = count('activityLines'); p.activityWins = count('activityWins');
+    if (raw['activityClaims'] is List) p.activityClaims.addAll((raw['activityClaims'] as List).whereType<String>());
+    if (raw['paidReceipts'] is List) p.paidReceipts.addAll((raw['paidReceipts'] as List).whereType<String>());
     p.coins = count('coins'); p.lifetimeLines = count('lines'); p.runs = count('runs');
     if (raw['stars'] is Map) {
       (raw['stars'] as Map).forEach((k, v) {
@@ -201,6 +240,19 @@ class ProgressStore extends ChangeNotifier {
           else { note = 'Complete the objective to earn today’s reward'; }
           break;
       }
+      if (p.activityDay == null || today.compareTo(p.activityDay!) >= 0) {
+        if (p.activityDay != today) {
+          p.activityDay = today; p.activityRuns = 0; p.activityLines = 0; p.activityWins = 0; p.activityClaims.clear();
+        }
+        if (lines > 0 || completed) p.activityRuns++;
+        p.activityLines += lines.clamp(0, 10000).toInt();
+        if (completed) p.activityWins++;
+      }
+      if (p.activeJourneyRun == runId) {
+        p.refreshLives(_utcNow());
+        if (won) { p.lives = (p.lives + 1).clamp(0, 5); if (p.lives == 5) p.lifeAnchorMs = 0; }
+        p.activeJourneyRun = null;
+      }
       p.lifetimeLines += lines.clamp(0, 10000).toInt();
       if (lines > 0 || completed) p.runs++;
       final unlocked = <String>[];
@@ -215,6 +267,50 @@ class ProgressStore extends ChangeNotifier {
       if (p.settledRuns.length > 256) p.settledRuns.removeAt(0);
       return RunReward(coins, earnedStars, unlocked, details: details, note: note);
     });
+  DateTime get now => _utcNow().toUtc();
+  Future<bool> beginJourney(String runId) => _transaction((p) {
+    if (p.activeJourneyRun == runId) return true;
+    p.refreshLives(now);
+    if (p.lives == 0) return false;
+    if (p.lives == 5) p.lifeAnchorMs = now.millisecondsSinceEpoch;
+    p.lives--; p.activeJourneyRun = runId;
+    return true;
+  });
+  Future<bool> refillWithCoins() => _transaction((p) {
+    p.refreshLives(now);
+    if (p.lives == 5 || p.coins < 150) return false;
+    p.coins -= 150; p.lives = 5; p.lifeAnchorMs = 0;
+    return true;
+  });
+  Future<bool> grantAdLife() => _transaction((p) {
+    p.refreshLives(now);
+    if (p.lives == 5) return false;
+    p.lives++; if (p.lives == 5) p.lifeAnchorMs = 0;
+    return true;
+  });
+  Future<bool> claimActivity(String id) => _transaction((p) {
+    final task = dailyActivities.where((t) => t.id == id).firstOrNull;
+    if (task == null) return false;
+    final today = utcDay(now);
+    if (p.activityDay != null && today.compareTo(p.activityDay!) < 0) return false;
+    if (p.activityDay != today) {
+      p.activityDay = today; p.activityRuns = 0; p.activityLines = 0; p.activityWins = 0; p.activityClaims.clear();
+    }
+    if (p.activityClaims.contains(id) || p.activityValue(id) < task.target) return false;
+    p.coins += task.coins; p.activityClaims.add(id);
+    return true;
+  });
+  // Called only after the configured server verifies the store token. The server
+  // must also maintain an authoritative purchase ledger across reinstalls/devices.
+  Future<void> grantVerifiedPurchase(String receipt, String product) => _transaction((p) {
+    if (receipt.isEmpty || p.paidReceipts.contains(receipt)) return;
+    switch (product) {
+      case 'tblock_coins_500': p.coins += 500;
+      case 'tblock_coins_1500': p.coins += 1500;
+      default: throw ArgumentError('Unknown store product');
+    }
+    p.paidReceipts.add(receipt);
+  });
   Future<PurchaseResult> buy(String id, {bool equip = false}) => _transaction((p) {
     final item = itemForId(id);
     if (item == null) return PurchaseResult.unavailable;
@@ -238,3 +334,15 @@ class ProgressStore extends ChangeNotifier {
   @override
   void dispose() { _disposed = true; super.dispose(); }
 }
+
+class DailyActivity {
+  const DailyActivity(this.id, this.title, this.target, this.coins);
+  final String id, title;
+  final int target, coins;
+}
+const dailyActivities = [
+  DailyActivity('visit', 'Your daily gift', 0, 25),
+  DailyActivity('play', 'Finish 3 runs with a line cleared', 3, 40),
+  DailyActivity('lines', 'Clear 20 lines', 20, 60),
+  DailyActivity('win', 'Complete a Journey, Sprint or Daily goal', 1, 50),
+];

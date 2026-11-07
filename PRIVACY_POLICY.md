@@ -2,7 +2,7 @@
 
 ## About this policy
 
-T-BLOCK is developed by somsubhrasihi-arch. This policy covers T-BLOCK version 1.8.0, including Classic, Journey, Sprint, Daily Challenge, practice and the earned-coin shop. Last updated: 8 November 2026.
+T-BLOCK is developed by somsubhrasihi-arch. This policy covers T-BLOCK version 1.9.0, including Classic, Journey, Sprint, Daily Challenge, practice and the earned-coin shop. Last updated: 8 November 2026.
 
 ## Information stored on your device
 
@@ -27,3 +27,6 @@ You can change audio, vibration, controls and motion settings in the game. You c
 ## Contact and changes
 
 For support or privacy questions, contact the developer through https://github.com/somsubhrasihi-arch/zen-blocks-nature/issues. This policy will be updated before adding features that change data handling, such as accounts, cloud saves, analytics, ads or payments.
+
+
+Version 1.9 also stores daily activity claims, regenerating Journey lives and purchase-delivery receipts locally. The default build includes inactive Google Play Billing and AdMob integrations. No ads are requested and no checkout opens without explicit build configuration. An updated policy and store disclosures are required before live services are activated.

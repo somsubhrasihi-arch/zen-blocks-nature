@@ -17,7 +17,7 @@ See [UX_REVIEW.md](UX_REVIEW.md) for findings and implemented changes. This rele
 ## Modes and rewards
 
 - Classic keeps the original endless game and personal best.
-- Journey adds 30 stages in three worlds: First Light, Prism Peaks and Cosmic Heights.
+- Journey keeps the original 30 stages, then generates new worlds without a final stage.
 - Stages challenge players to clear lines, reach a score or excavate marked rows.
 - Earn 1–3 stars based on blocks used. World two requires 12 stars; world three requires 28, plus the preceding stage.
 - Sprint races to 40 lines, tracks active-play time and saves a personal best. Pausing, returning home and app backgrounding stop the timer. Resume keeps the accumulated time.
@@ -49,3 +49,7 @@ Catalog IDs such as `skin:pixel` are stable ownership IDs, separate from display
 ## Validation
 
 `flutter test` covers gameplay, saves, audio, device layouts, stage objectives and restoration, Sprint timing and records, deterministic Daily bags, UTC rollover and streaks, duplicate Daily claims, replay limits, legacy wallet migration, reward receipts, world gates, achievement bonuses, concurrent shop debits and equipped ownership. UI screenshots are published as the `T-BLOCK-UI-Previews` Actions artifact.
+
+
+## Version 1.9
+Journey now continues beyond the original 30 stages with generated worlds. Daily activities award claimable coins. Five regenerating Journey lives can be refilled with coins. Optional Google Play coin packs and AdMob rewarded lives are integrated but disabled pending owner setup; see [MONETIZATION_SETUP.md](MONETIZATION_SETUP.md) for activation and backend requirements.

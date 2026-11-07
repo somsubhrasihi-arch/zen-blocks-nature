@@ -6,8 +6,8 @@ class JourneyStage {
   final String name;
   final StageGoal goal;
   int get world => (id - 1) ~/ 10;
-  int get startLevel => 1 + world * 2;
-  int get requiredStars => [0, 12, 28][world];
+  int get startLevel => (1 + world * 2).clamp(1, 9);
+  int get requiredStars => world < 3 ? [0, 12, 28][world] : 28;
   int get obstacleCount => goal == StageGoal.excavation ? target : 0;
   String get objective => switch (goal) {
     StageGoal.lines => 'Clear $target lines',
@@ -52,7 +52,30 @@ const journeyStages = [
   JourneyStage(29, 'Final Frontier', StageGoal.excavation, 7, 28),
   JourneyStage(30, 'Cosmic Champion', StageGoal.lines, 16, 54),
 ];
-JourneyStage? stageForId(int? id) => id != null && id >= 1 && id <= journeyStages.length ? journeyStages[id - 1] : null;
+// Keep the original stages stable for existing saves. Later worlds are generated
+// on demand; no growing in-memory list or final campaign stage is needed.
+JourneyStage? stageForId(int? id) {
+  if (id == null || id < 1) return null;
+  if (id <= journeyStages.length) return journeyStages[id - 1];
+  final step = (id - 1) % 10;
+  final tier = ((id - 31) ~/ 30).clamp(0, 6);
+  final goal = StageGoal.values[(id - 31) % 3];
+  final target = switch (goal) {
+    StageGoal.lines => 8 + tier * 2 + step,
+    StageGoal.score => 3500 + tier * 750 + step * 350,
+    StageGoal.excavation => 4 + (step % 4) + tier ~/ 3,
+  };
+  final budget = switch (goal) {
+    StageGoal.lines => target * 4 + 6,
+    StageGoal.score => target ~/ 180 + 18,
+    StageGoal.excavation => target * 5,
+  };
+  return JourneyStage(id, '${['Aurora Trail', 'Prism Voyage', 'Starbound'][((id - 1) ~/ 10) % 3]} $id', goal, target, budget);
+}
+String worldName(int world) => world < 3 ? worldNames[world] : '${['Aurora Isles', 'Prism Gardens', 'Starfall Skies'][(world - 3) % 3]} · ${world + 1}';
+Iterable<JourneyStage> stagesInWorld(int world) sync* {
+  for (var id = world * 10 + 1; id <= world * 10 + 10; id++) { yield stageForId(id)!; }
+}
 
 enum CosmeticKind { skin, effect }
 class ShopItem {
@@ -87,7 +110,7 @@ const achievements = [
   Achievement('hundredLines', 'Century Club', 'Clear 100 lines across finished runs', 150, 100),
   Achievement('firstStage', 'Adventure Begins', 'Complete your first Journey stage', 30, 1),
   Achievement('tenStages', 'First Light Champion', 'Complete 10 Journey stages', 150, 10),
-  Achievement('allStages', 'Cosmic Champion', 'Complete all 30 Journey stages', 500, 30),
+  Achievement('allStages', 'Cosmic Champion', 'Complete the first 30 Journey stages', 500, 30),
   Achievement('sixtyStars', 'Star Collector', 'Earn 60 Journey stars', 300, 60),
   Achievement('sprintFirst', 'Across the Finish Line', 'Finish your first 40-line Sprint', 75, 1),
   Achievement('sprintSwift', 'Quick Stack', 'Finish Sprint in five minutes or less', 100, 1),

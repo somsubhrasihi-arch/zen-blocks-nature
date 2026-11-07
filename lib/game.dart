@@ -99,7 +99,7 @@ class ZenGame extends ChangeNotifier {
     notifyListeners();
   }
 
-  void start({JourneyStage? journeyStage, PlayMode playMode = PlayMode.classic, String? dailyDay}) {
+  void start({String? runReceipt, JourneyStage? journeyStage, PlayMode playMode = PlayMode.classic, String? dailyDay}) {
     if (started && !over && !completed) return;
     reset();
     stage = journeyStage;
@@ -107,7 +107,7 @@ class ZenGame extends ChangeNotifier {
     daily = mode == PlayMode.daily ? dailyForDay(dailyDay ?? utcDay(DateTime.now())) : null;
     if (mode == PlayMode.daily && daily == null) mode = PlayMode.classic;
     if (daily != null) { _bag.clear(); _dailyBag = 0; nextKind = _drawKind(); }
-    runId = '${DateTime.now().microsecondsSinceEpoch}-${_random.nextInt(1 << 30)}';
+    runId = runReceipt ?? '${DateTime.now().microsecondsSinceEpoch}-${_random.nextInt(1 << 30)}';
     level = initialLevel;
     if (initialObstacles > 0) {
       for (var row = 0; row < initialObstacles; row++) {

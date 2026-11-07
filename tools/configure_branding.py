@@ -1,6 +1,7 @@
 """Apply T-BLOCK branding after Flutter generates Android scaffolding."""
 from pathlib import Path
 import xml.etree.ElementTree as ET
+import os
 
 ROOT = Path(__file__).resolve().parents[1]
 ANDROID_NS = 'http://schemas.android.com/apk/res/android'
@@ -13,6 +14,16 @@ if application is None:
     raise SystemExit('Android application manifest was not found.')
 application.set(f'{{{ANDROID_NS}}}label', 'T-BLOCK')
 application.set(f'{{{ANDROID_NS}}}icon', '@mipmap/ic_launcher')
+# Linking the Ads SDK requires an application ID even when ad requests are disabled.
+for existing in list(application.findall('meta-data')):
+    if existing.get(f'{{{ANDROID_NS}}}name') == 'com.google.android.gms.ads.APPLICATION_ID':
+        application.remove(existing)
+meta = ET.SubElement(application, 'meta-data')
+meta.set(f'{{{ANDROID_NS}}}name', 'com.google.android.gms.ads.APPLICATION_ID')
+meta.set(f'{{{ANDROID_NS}}}value', os.environ.get('ADMOB_APP_ID', 'ca-app-pub-3940256099942544~3347511713'))
+if not any(n.get(f'{{{ANDROID_NS}}}name') == 'android.permission.INTERNET' for n in tree.getroot().findall('uses-permission')):
+    permission = ET.SubElement(tree.getroot(), 'uses-permission')
+    permission.set(f'{{{ANDROID_NS}}}name', 'android.permission.INTERNET')
 tree.write(manifest, encoding='utf-8', xml_declaration=True)
 
 tiles = [(28, 34, '#56E5FA'), (46, 34, '#63D7FA'), (64, 34, '#82B8FF'), (46, 52, '#8B8CF8')]

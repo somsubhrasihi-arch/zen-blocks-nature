@@ -22,6 +22,7 @@ export 'clear_effect.dart';
 import 'practice_screen.dart';
 import 'app_info_screen.dart';
 import 'app_policy.dart';
+import 'monetization.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -88,6 +89,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   int joystickRepeat = 120;
   final SessionStore sessions = SessionStore();
   final ProgressStore progress = ProgressStore();
+  late final Monetization monetization = Monetization(progress);
+  bool _starting = false;
   RunReward? _runReward;
   String? _settlingRun, _rewardError;
   bool _settling = false;
@@ -95,7 +98,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   void _progressChanged() { if (mounted) setState(() {}); }
   void _openHub([int tab = 0]) {
     Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => Theme(data: _themeData,
-      child: AdventureHub(palette: _palette, progress: progress, initialTab: tab, reduceMotion: !_motionAllowed,
+      child: AdventureHub(monetization: monetization, palette: _palette, progress: progress, initialTab: tab, reduceMotion: !_motionAllowed,
         onStage: (stage) => _startNewGame(journeyStage: stage)))));
   }
   Future<void> _settleFinished() async {
@@ -127,6 +130,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   @override
   void initState() {
     super.initState();
+    unawaited(monetization.initialize());
     audio = widget.audio ?? GameAudio();
     unawaited(audio.prepare());
     aurora = AnimationController(vsync: this, duration: Duration(seconds: 8))..repeat();
@@ -270,7 +274,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   }
 
   Future<void> _startNewGame({bool confirm = true, JourneyStage? journeyStage, PlayMode playMode = PlayMode.classic, String? dailyDay}) async {
-    if (_loading || _settling || _rewardError != null) return;
+    if (_loading || _settling || _rewardError != null || _starting) return;
     if (journeyStage != null && !progress.data.unlocked(journeyStage)) return;
     if (confirm && (game.saveState() != null || _savedState != null)) {
       final replace = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
@@ -281,12 +285,26 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       ));
       if (replace != true || !mounted) return;
     }
+    final receipt = '${DateTime.now().microsecondsSinceEpoch}-${math.Random().nextInt(1 << 30)}';
+    if (journeyStage != null) {
+      _starting = true;
+      try {
+        if (!await progress.beginJourney(receipt)) {
+          if (mounted) _openHub(3);
+          return;
+        }
+      } catch (_) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not save your life. Please try again.')));
+        return;
+      } finally { _starting = false; }
+      if (!mounted) return;
+    }
     _saveDebounce?.cancel();
     game.reset();
     _rewardDetailsExpanded = false;
     _runReward = null; _settlingRun = null; _rewardError = null;
     setState(() { _home = false; _savedState = null; });
-    game.start(journeyStage: journeyStage, playMode: playMode, dailyDay: dailyDay);
+    game.start(runReceipt: receipt, journeyStage: journeyStage, playMode: playMode, dailyDay: dailyDay);
     _scheduleTick();
     _syncAudio();
     unawaited(_persistNow());
@@ -414,8 +432,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
         Icons.bolt_rounded, _loading ? null : _startNewGame, primary: _savedState == null,
         accent: _savedState == null ? _palette.accent : _palette.blocks[2], height: 62, subtitle: 'Endless play · Set your own best')),
       SizedBox(height: 12),
-      SizedBox(width: double.infinity, child: _button('Journey · ${progress.data.stars.length}/30', Icons.route_rounded,
-        _loading ? null : () => _openHub(), accent: _palette.blocks[2], height: 62, subtitle: '30 stages · Clear goals and collect stars')),
+      SizedBox(width: double.infinity, child: _button('Journey · Stage ${progress.data.recommendedStage?.id ?? 1}', Icons.route_rounded,
+        _loading ? null : () => _openHub(), accent: _palette.blocks[2], height: 62, subtitle: 'Unlimited worlds · Collect stars')),
       SizedBox(height: 10),
       Row(children: [Expanded(child: _button('Sprint', Icons.timer_rounded, _loading ? null : () => _showModeIntro(PlayMode.sprint), height: 62, subtitle: '40 lines · Beat the clock')),
         SizedBox(width: 10), Expanded(child: _button('Daily Challenge', Icons.today_rounded,
@@ -424,6 +442,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       Row(children: [Expanded(child: _button('Shop · ${progress.data.coins}', Icons.shopping_bag_rounded,
           _loading ? null : () => _openHub(1), accent: _palette.blocks[1], height: 50)),
         SizedBox(width: 10), Expanded(child: _button('Achievements', Icons.emoji_events_rounded, _loading ? null : () => _openHub(2), height: 50))]),
+      SizedBox(height: 10),
+      SizedBox(width: double.infinity, child: _button('Daily rewards & lives', Icons.card_giftcard_rounded, _loading ? null : () => _openHub(3), height: 50)),
       SizedBox(height: 14),
       Row(children: [
         Expanded(child: _button('How to play', Icons.sports_esports_rounded, _showHowToPlay, height: 50)),
@@ -513,6 +533,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     aurora.dispose();
     burst.dispose();
     progress.removeListener(_progressChanged);
+    monetization.dispose();
     progress.dispose();
     game.removeListener(_onGameChanged);
     game.dispose();
@@ -683,9 +704,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
             _button('Retry saving', Icons.save_rounded, _settleFinished, height: 48)],
         ],
         SizedBox(height: 16),
-        if (game.completed && game.stage != null && game.stage!.id < 30 && progress.data.unlocked(journeyStages[game.stage!.id])) ...[
+        if (game.completed && game.stage != null && progress.data.unlocked(stageForId(game.stage!.id + 1)!)) ...[
           _button('Next stage', Icons.arrow_forward_rounded, _settling || _rewardError != null ? null : () =>
-            _startNewGame(confirm: false, journeyStage: journeyStages[game.stage!.id]), primary: true, height: 50), SizedBox(height: 8),
+            _startNewGame(confirm: false, journeyStage: stageForId(game.stage!.id + 1)!), primary: true, height: 50), SizedBox(height: 8),
         ],
         _button(game.paused ? 'Resume' : game.stage == null ? 'Play again' : 'Replay stage', Icons.play_arrow_rounded,
           _settling || _rewardError != null ? null : () {

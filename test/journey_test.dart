@@ -85,7 +85,7 @@ void main() {
     final game = ZenGame()..start();
     final before = game.saveState();
     final bad = jsonDecode(jsonEncode(before)) as Map<String,dynamic>;
-    bad['stageId'] = 99;
+    bad['stageId'] = -1;
     expect(game.restoreState(bad), false);
     expect(game.saveState(), before);
     game.dispose();
@@ -153,7 +153,7 @@ void main() {
     addTearDown(()=>tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(RepaintBoundary(key:captureKey,child:ZenBlocksApp(audio:GameAudio(backend:FakeAudioBackend()))));
     await tester.pump();await tester.pump();await tester.pump();
-    await tester.tap(find.text('Journey · 0/30'));await tester.pump();await tester.pump(const Duration(milliseconds:350));
+    await tester.tap(find.text('Journey · Stage 1'));await tester.pump();await tester.pump(const Duration(milliseconds:350));
     expect(find.text('Play stage 1'),findsOneWidget);
     await capture(tester,'08-journey');
     await tester.ensureVisible(find.text('Play stage 1'));

@@ -64,7 +64,7 @@ void main() {
     final p=PlayerProgress();expect(p.recommendedStage!.id,1);p.stars[1]=3;expect(p.recommendedStage!.id,2);
     for(var i=1;i<=10;i++) {p.stars[i]=1;}
     expect(p.recommendedStage!.world,0);p.stars[1]=3;expect(p.recommendedStage!.id,11);
-    for(var i=1;i<=30;i++) {p.stars[i]=3;}expect(p.recommendedStage,isNull);
+    for(var i=1;i<=30;i++) {p.stars[i]=3;}expect(p.recommendedStage!.id,31);
   });
   test('buy-and-equip commits ownership, selection and balance together',()async{
     final store=ProgressStore();await store.load();await store.settle(runId:'earn',lines:2,pieces:6,stageId:1,completed:true,stars:3);
