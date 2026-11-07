@@ -10,7 +10,8 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => SharedPreferences.setMockInitialValues({}));
   test('SDK load failure retains its cause, releases retry and grants no life', () async {
-    final progress = ProgressStore(); await progress.load();
+    var now = DateTime.utc(2026, 11, 8);
+    final progress = ProgressStore(utcNow: () => now); await progress.load();
     await progress.beginJourney('attempt');
     var requests = 0;
     final service = Monetization(progress,
@@ -25,6 +26,8 @@ void main() {
     expect(service.adDiagnostic, contains('Code: 2'));
     expect(service.adDiagnostic, contains('Network error'));
     expect(service.adDiagnostic, contains('Loading rewarded ad'));
+    expect(await service.watchForLife(), false); expect(requests, 1);
+    now = now.add(const Duration(seconds: 16));
     expect(await service.watchForLife(), false); expect(requests, 2);
     expect(progress.data.lives, 4);
     service.dispose(); progress.dispose();

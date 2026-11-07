@@ -2,7 +2,7 @@ name: Build Zen Blocks Android APK
 on:
   workflow_dispatch:
   push:
-    branches: [main, fix/rewarded-ad-diagnostics-1-9-2]
+    branches: [main, feature/player-engagement-1-10]
 jobs:
   build-apk:
     runs-on: ubuntu-latest

@@ -44,3 +44,6 @@ Phone test: enter Journey to reserve a life; open Rewards; tap Watch test ad; co
 
 
 Version 1.9.2 preserves SDK load/show failures and distinguishes request timeouts. Debug builds include expandable Ad test details (stage, unit, error code/domain/message) after a failed request. No error report is automatically sent anywhere. The user can share that text to diagnose device/network failures. SDK initialization and loading are bounded, late loaded ads are disposed, and failed requests release the busy state without granting lives. The sample unit and sample manifest App ID remain unchanged. Runtime ad delivery still requires a phone/network test.
+
+
+Version 1.10.0 adds an optional 25-coin post-run ad offer (three per UTC day) and caps life ads at five per day. Completed ads are separated by a 60-second cooldown; failed requests are backed off without automatic retry. Create a separate rewarded AdMob unit with reward amount 25 and reward item Block Coins before activating production coin bonuses, then set REWARDED_COIN_AD_UNIT_ID. It is empty by default; the production life unit must not be reused for coin rewards. Test mode uses Google sample creatives. New style collections spend earned or verified coins at a transparent 20% reduction for missing items only. All competitive rules and scores remain independent of these purchases/rewards.

@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'campaign.dart';
 import 'play_modes.dart';
+import 'engagement.dart';
 
 class PlayerProgress {
   int coins = 0, lifetimeLines = 0, runs = 0;
@@ -12,6 +13,17 @@ class PlayerProgress {
   int lives = 5, lifeAnchorMs = 0;
   String? activeJourneyRun, activityDay;
   int activityRuns = 0, activityLines = 0, activityWins = 0;
+  int giftDays = 0;
+  String? week, rewardedAdDay, bonusRunId, bonusRunDay;
+  int weekRuns = 0, weekLines = 0, weekWins = 0, coinAds = 0, lifeAds = 0;
+  bool bonusRunClaimed = false;
+  final Set<String> weeklyClaims = {};
+  final Map<String, DailyRecord> dailyRecords = {};
+  int weeklyValue(String id) => switch (id) { 'runs' => weekRuns, 'lines' => weekLines, 'wins' => weekWins, _ => 0 };
+  int adCount(String day, {bool coins = false}) => rewardedAdDay == day ? (coins ? coinAds : lifeAds) : 0;
+  bool canClaimRunAd(String runId, String day) => bonusRunId == runId && bonusRunDay == day &&
+    !bonusRunClaimed && adCount(day, coins: true) < 3 && (rewardedAdDay == null || day.compareTo(rewardedAdDay!) >= 0);
+
   final Set<String> activityClaims = {}, paidReceipts = {};
   static const lifeIntervalMs = 30 * 60 * 1000;
   int livesAt(DateTime now) => (lives + (lifeAnchorMs == 0 ? 0 : ((now.millisecondsSinceEpoch - lifeAnchorMs) ~/ lifeIntervalMs).clamp(0, 5))).clamp(0, 5);
@@ -76,6 +88,10 @@ class PlayerProgress {
     'lives': lives, 'lifeAnchorMs': lifeAnchorMs, 'activeJourneyRun': activeJourneyRun,
     'activityDay': activityDay, 'activityRuns': activityRuns, 'activityLines': activityLines,
     'activityWins': activityWins, 'activityClaims': activityClaims.toList(), 'paidReceipts': paidReceipts.toList(),
+    'giftDays': giftDays, 'week': week, 'weekRuns': weekRuns, 'weekLines': weekLines, 'weekWins': weekWins,
+    'weeklyClaims': weeklyClaims.toList(), 'rewardedAdDay': rewardedAdDay, 'coinAds': coinAds, 'lifeAds': lifeAds,
+    'bonusRunId': bonusRunId, 'bonusRunDay': bonusRunDay, 'bonusRunClaimed': bonusRunClaimed,
+    'dailyRecords': dailyRecords.map((day, record) => MapEntry(day, record.toJson())),
     'practiceDay': practiceDay, 'practiceCoins': practiceCoins};
   static PlayerProgress fromJson(Object? raw) {
     final p = PlayerProgress();
@@ -93,6 +109,22 @@ class PlayerProgress {
     p.activityRuns = count('activityRuns'); p.activityLines = count('activityLines'); p.activityWins = count('activityWins');
     if (raw['activityClaims'] is List) p.activityClaims.addAll((raw['activityClaims'] as List).whereType<String>());
     if (raw['paidReceipts'] is List) p.paidReceipts.addAll((raw['paidReceipts'] as List).whereType<String>());
+    p.giftDays = raw['giftDays'] is int ? count('giftDays') : p.activityClaims.contains('visit') ? 1 : 0; p.weekRuns = count('weekRuns'); p.weekLines = count('weekLines'); p.weekWins = count('weekWins');
+    p.coinAds = count('coinAds').clamp(0, 3); p.lifeAds = count('lifeAds').clamp(0, 5);
+    if (raw['week'] is String && parseDay(raw['week'])?.weekday == DateTime.monday) p.week = raw['week'];
+    if (raw['weeklyClaims'] is List) p.weeklyClaims.addAll((raw['weeklyClaims'] as List).whereType<String>().where((id) => id == 'chest' || weeklyMissions.any((m) => m.id == id)));
+    if (raw['rewardedAdDay'] is String && parseDay(raw['rewardedAdDay']) != null) p.rewardedAdDay = raw['rewardedAdDay'];
+    if (raw['bonusRunDay'] is String && parseDay(raw['bonusRunDay']) != null) p.bonusRunDay = raw['bonusRunDay'];
+    if (raw['bonusRunId'] is String) p.bonusRunId = raw['bonusRunId'];
+    p.bonusRunClaimed = raw['bonusRunClaimed'] == true;
+    if (raw['dailyRecords'] is Map) {
+      final records = raw['dailyRecords'] as Map;
+      for (final day in records.keys.whereType<String>().where((day) => parseDay(day) != null).toList()..sort()) {
+        final record = DailyRecord.fromJson(records[day]);
+        if (record != null) p.dailyRecords[day] = record;
+      }
+      while (p.dailyRecords.length > 14) { p.dailyRecords.remove(p.dailyRecords.keys.first); }
+    }
     p.coins = count('coins'); p.lifetimeLines = count('lines'); p.runs = count('runs');
     if (raw['stars'] is Map) {
       (raw['stars'] as Map).forEach((k, v) {
@@ -248,6 +280,26 @@ class ProgressStore extends ChangeNotifier {
         p.activityLines += lines.clamp(0, 10000).toInt();
         if (completed) p.activityWins++;
       }
+      final thisWeek = utcWeek(now);
+      if (p.week == null || thisWeek.compareTo(p.week!) >= 0) {
+        if (p.week != thisWeek) { p.week = thisWeek; p.weekRuns = 0; p.weekLines = 0; p.weekWins = 0; p.weeklyClaims.clear(); }
+        if (lines > 0 || completed) p.weekRuns++;
+        p.weekLines += lines.clamp(0, 10000).toInt();
+        if (completed) p.weekWins++;
+      }
+      if (lines > 0 && (p.bonusRunDay == null || today.compareTo(p.bonusRunDay!) >= 0)) {
+        p.bonusRunId = runId; p.bonusRunDay = today; p.bonusRunClaimed = false;
+      }
+      if (selectedMode == PlayMode.daily && completed && dailyDay != null && elapsedMs > 0 && pieces > 0) {
+        final challenge = dailyForDay(dailyDay);
+        final achieved = switch (challenge?.goal) { StageGoal.lines => lines, StageGoal.score => score, StageGoal.excavation => obstaclesCleared, _ => 0 };
+        if (challenge != null && achieved >= challenge.target) {
+          final record = DailyRecord(elapsedMs: elapsedMs, pieces: pieces, score: score);
+          if (p.dailyRecords[dailyDay] == null || record.beats(p.dailyRecords[dailyDay]!)) p.dailyRecords[dailyDay] = record;
+          final days = p.dailyRecords.keys.toList()..sort();
+          for (final day in days.take((days.length - 14).clamp(0, days.length))) { p.dailyRecords.remove(day); }
+        }
+      }
       if (p.activeJourneyRun == runId) {
         p.refreshLives(_utcNow());
         if (won) { p.lives = (p.lives + 1).clamp(0, 5); if (p.lives == 5) p.lifeAnchorMs = 0; }
@@ -282,22 +334,49 @@ class ProgressStore extends ChangeNotifier {
     p.coins -= 150; p.lives = 5; p.lifeAnchorMs = 0;
     return true;
   });
+  bool _prepareAdDay(PlayerProgress p, String day) {
+    if (p.rewardedAdDay != null && day.compareTo(p.rewardedAdDay!) < 0) return false;
+    if (p.rewardedAdDay != day) { p.rewardedAdDay = day; p.coinAds = 0; p.lifeAds = 0; }
+    return true;
+  }
+  bool get canWatchLifeAd => data.livesAt(now) < 5 && data.adCount(utcDay(now)) < 5 &&
+    (data.rewardedAdDay == null || utcDay(now).compareTo(data.rewardedAdDay!) >= 0);
   Future<bool> grantAdLife() => _transaction((p) {
     p.refreshLives(now);
-    if (p.lives == 5) return false;
-    p.lives++; if (p.lives == 5) p.lifeAnchorMs = 0;
+    final day = utcDay(now);
+    if (p.lives == 5 || !_prepareAdDay(p, day) || p.lifeAds >= 5) return false;
+    p.lifeAds++; p.lives++; if (p.lives == 5) p.lifeAnchorMs = 0;
     return true;
   });
+  Future<bool> grantRunAdBonus(String runId) => _transaction((p) {
+    final day = utcDay(now);
+    if (!p.canClaimRunAd(runId, day) || !_prepareAdDay(p, day)) return false;
+    p.bonusRunClaimed = true; p.coinAds++; p.coins += 25;
+    return true;
+  });
+  Future<bool> claimWeekly(String id) => _transaction((p) {
+    final week = utcWeek(now);
+    if (p.week != week || p.weeklyClaims.contains(id)) return false;
+    if (id == 'chest') {
+      if (!weeklyMissions.every((m) => p.weeklyClaims.contains(m.id))) return false;
+      p.weeklyClaims.add(id); p.coins += 100; return true;
+    }
+    final mission = weeklyMissions.where((m) => m.id == id).firstOrNull;
+    if (mission == null || p.weeklyValue(id) < mission.target) return false;
+    p.weeklyClaims.add(id); p.coins += mission.coins; return true;
+  });
   Future<bool> claimActivity(String id) => _transaction((p) {
-    final task = dailyActivities.where((t) => t.id == id).firstOrNull;
+    final task = dailyActivitiesFor(utcDay(now)).where((t) => t.id == id).firstOrNull;
     if (task == null) return false;
     final today = utcDay(now);
     if (p.activityDay != null && today.compareTo(p.activityDay!) < 0) return false;
     if (p.activityDay != today) {
       p.activityDay = today; p.activityRuns = 0; p.activityLines = 0; p.activityWins = 0; p.activityClaims.clear();
     }
-    if (p.activityClaims.contains(id) || p.activityValue(id) < task.target) return false;
-    p.coins += task.coins; p.activityClaims.add(id);
+    if (p.activityClaims.contains(id) || p.activityValue(task.counter) < task.target) return false;
+    p.coins += id == 'visit' ? visitReward(p.giftDays) : task.coins;
+    if (id == 'visit') p.giftDays++;
+    p.activityClaims.add(id);
     return true;
   });
   // Called only after the configured server verifies the store token. The server
@@ -310,6 +389,16 @@ class ProgressStore extends ChangeNotifier {
       default: throw ArgumentError('Unknown store product');
     }
     p.paidReceipts.add(receipt);
+  });
+  Future<PurchaseResult> buyBundle(String id) => _transaction((p) {
+    final bundle = shopBundles.where((b) => b.id == id).firstOrNull;
+    if (bundle == null) return PurchaseResult.unavailable;
+    final missing = bundle.items.where((item) => !p.owned.contains(item)).toList();
+    if (missing.isEmpty) return PurchaseResult.owned;
+    final cost = bundle.priceFor(p.owned);
+    if (p.coins < cost) return PurchaseResult.insufficient;
+    p.coins -= cost; p.owned.addAll(missing);
+    return PurchaseResult.purchased;
   });
   Future<PurchaseResult> buy(String id, {bool equip = false}) => _transaction((p) {
     final item = itemForId(id);
@@ -336,7 +425,9 @@ class ProgressStore extends ChangeNotifier {
 }
 
 class DailyActivity {
-  const DailyActivity(this.id, this.title, this.target, this.coins);
+  const DailyActivity(this.id, this.title, this.target, this.coins, {this.metric});
+  final String? metric;
+  String get counter => metric ?? id;
   final String id, title;
   final int target, coins;
 }
@@ -346,3 +437,14 @@ const dailyActivities = [
   DailyActivity('lines', 'Clear 20 lines', 20, 60),
   DailyActivity('win', 'Complete a Journey, Sprint or Daily goal', 1, 50),
 ];
+
+List<DailyActivity> dailyActivitiesFor(String day) {
+  final date = parseDay(day)!;
+  final index = date.millisecondsSinceEpoch ~/ Duration.millisecondsPerDay;
+  final focus = switch (index % 3) {
+    0 => DailyActivity('focus', 'Focus quest: clear ${30 + index % 2 * 5} lines', 30 + index % 2 * 5, 75, metric: 'lines'),
+    1 => const DailyActivity('focus', 'Focus quest: finish 5 qualifying runs', 5, 75, metric: 'play'),
+    _ => const DailyActivity('focus', 'Focus quest: complete 2 objectives', 2, 75, metric: 'win'),
+  };
+  return [...dailyActivities, focus];
+}

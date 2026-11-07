@@ -22,6 +22,9 @@ export 'clear_effect.dart';
 import 'practice_screen.dart';
 import 'app_info_screen.dart';
 import 'app_policy.dart';
+import 'engagement.dart';
+import 'friend_challenges.dart';
+import 'ad_help.dart';
 import 'monetization.dart';
 
 void main() {
@@ -101,6 +104,34 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       child: AdventureHub(monetization: monetization, palette: _palette, progress: progress, initialTab: tab, reduceMotion: !_motionAllowed,
         onStage: (stage) => _startNewGame(journeyStage: stage)))));
   }
+  void _openFriends() {
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => Theme(data: _themeData,
+      child: FriendChallenges(palette: _palette, progress: progress,
+        onChallenge: (day) => _startNewGame(playMode: PlayMode.daily, dailyDay: day)))));
+  }
+  Future<void> _shareDaily() async {
+    final day = game.daily?.day;
+    if (day == null) return;
+    try { await shareFriendChallenge(day, progress.data.dailyRecords[day]); }
+    catch (_) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sharing is unavailable right now.'))); }
+  }
+  Widget _runAdBonus() {
+    final id = game.runId, data = progress.data, day = utcDay(progress.now);
+    if (!monetization.coinAdsConfigured || data.bonusRunId != id || data.bonusRunDay != day ||
+      (!data.bonusRunClaimed && !data.canClaimRunAd(id, day))) return const SizedBox.shrink();
+    if (data.bonusRunClaimed) return Padding(padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Text('Ad bonus saved · +25 coins', style: TextStyle(color: _palette.accent, fontSize: 12)));
+    return Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Column(children: [
+      _button(monetization.usingTestAds ? 'Watch test ad · +25 coins' : 'Watch ad · +25 coins', Icons.ondemand_video_rounded,
+        !monetization.canRequestAd || _settling ? null : () => monetization.watchForRunBonus(id,
+          canShow: () => mounted && _foreground && !_home && game.runId == id && (game.over || game.completed)), height: 44),
+      SizedBox(height: 4), Text('Optional · ${data.adCount(day, coins: true)}/3 coin bonuses today', style: TextStyle(color: _palette.muted, fontSize: 11)),
+      if (monetization.hasAdFailure) ...[
+        Text(monetization.adStatus, textAlign: TextAlign.center, style: TextStyle(color: _palette.muted, fontSize: 11)),
+        TextButton(onPressed: () => showAdHelp(context), child: Text('Help with ads')),
+      ],
+    ]));
+  }
   Future<void> _settleFinished() async {
     if ((!game.over && !game.completed) || _settlingRun == game.runId) return;
     final id = game.runId;
@@ -141,6 +172,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     WidgetsBinding.instance.addObserver(this);
     game.addListener(_onGameChanged);
     progress.addListener(_progressChanged);
+    monetization.addListener(_progressChanged);
     _loadSettings();
     _scheduleTick();
   }
@@ -443,7 +475,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
           _loading ? null : () => _openHub(1), accent: _palette.blocks[1], height: 50)),
         SizedBox(width: 10), Expanded(child: _button('Achievements', Icons.emoji_events_rounded, _loading ? null : () => _openHub(2), height: 50))]),
       SizedBox(height: 10),
-      SizedBox(width: double.infinity, child: _button('Daily rewards & lives', Icons.card_giftcard_rounded, _loading ? null : () => _openHub(3), height: 50)),
+      SizedBox(width: double.infinity, child: _button('Daily rewards & lives', Icons.card_giftcard_rounded, _loading ? null : () => _openHub(3), height: 58, subtitle: 'Visit collection · Daily quests · Weekly chest')),
+      SizedBox(height: 10),
+      SizedBox(width: double.infinity, child: _button('Friend challenges', Icons.people_alt_rounded, _loading ? null : _openFriends, height: 50)),
       SizedBox(height: 14),
       Row(children: [
         Expanded(child: _button('How to play', Icons.sports_esports_rounded, _showHowToPlay, height: 50)),
@@ -533,6 +567,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     aurora.dispose();
     burst.dispose();
     progress.removeListener(_progressChanged);
+    monetization.removeListener(_progressChanged);
     monetization.dispose();
     progress.dispose();
     game.removeListener(_onGameChanged);
@@ -713,6 +748,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
             if (game.paused) { game.togglePause(); _scheduleTick(); }
             else { _startNewGame(confirm: false, journeyStage: game.stage, playMode: game.mode, dailyDay: game.daily?.day); }
           }, primary: !game.completed, height: 50),
+        if ((game.over || game.completed) && _runReward != null) _runAdBonus(),
+        if ((game.over || game.completed) && game.mode == PlayMode.daily) ...[SizedBox(height: 8),
+          _button('Share challenge result', Icons.share_rounded, _settling ? null : _shareDaily, height: 44)],
         if (game.paused) ...[SizedBox(height: 8), _button('Restart', Icons.replay_rounded,
           () => _startNewGame(journeyStage: game.stage, playMode: game.mode, dailyDay: game.daily?.day), height: 48)],
         if (game.stage != null && !game.paused) ...[SizedBox(height: 8), _button('Journey map', Icons.route_rounded,
