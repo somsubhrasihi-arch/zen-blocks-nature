@@ -1,4 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart';
+import 'package:zen_blocks/journey_ui.dart';
+import 'package:zen_blocks/customization.dart';
+import 'package:zen_blocks/monetization.dart';
+import 'product_ui_test.dart' show captureKey, capture, loadPreviewFonts;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zen_blocks/campaign.dart';
 import 'package:zen_blocks/game.dart';
@@ -111,4 +116,31 @@ void main() {
       expect(await store.grantAdLife(), false);
     },
   );
+  testWidgets('daily rewards are claimable and unconfigured monetization stays unavailable', (tester) async {
+    final store = ProgressStore(); await store.load();
+    final service = Monetization(store); await service.initialize();
+    expect(service.products, isEmpty);
+    expect(service.billingConfigured, false);
+    expect(service.adsConfigured, false);
+    await loadPreviewFonts();
+    await tester.binding.setSurfaceSize(const Size(412, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(RepaintBoundary(key: captureKey, child: MaterialApp(
+      theme: ThemeData(brightness: Brightness.dark), home: AdventureHub(palette: neonPalette,
+      progress: store, monetization: service, onStage: (_) {}, initialTab: 3))));
+    await tester.pump();
+    expect(find.text('Journey lives · 5 / 5'), findsOneWidget);
+    expect(find.text('Rewarded ads are not available in this build.'), findsOneWidget);
+    await capture(tester, '24-daily-rewards-lives');
+    await tester.scrollUntilVisible(find.text('Your daily gift'), 250, scrollable: find.byType(Scrollable).first);
+    await tester.pump();
+    final claim = find.text('Claim reward').first;
+    await tester.ensureVisible(claim); await tester.pump();
+    await tester.tap(claim); await tester.pump(); await tester.pump();
+    expect(store.data.coins, 25);
+    expect(find.text('Claimed'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink()); service.dispose(); store.dispose();
+  });
+
 }

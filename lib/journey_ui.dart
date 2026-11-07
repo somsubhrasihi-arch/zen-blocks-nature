@@ -153,7 +153,6 @@ class _AdventureHubState extends State<AdventureHub> {
     ]));
   }
   List<Widget> shop() => [
-    ...storeCards(),
     card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text('Make it yours', style: TextStyle(color: p.accent, fontSize: 22, fontWeight: FontWeight.w800)),
       const SizedBox(height: 8), Text('Preview a look. Unlock it with Block Coins and wear it straight away.', style: TextStyle(color: p.muted, height: 1.4)),
@@ -170,6 +169,7 @@ class _AdventureHubState extends State<AdventureHub> {
       Text('A little more play, a new look', style: TextStyle(color: p.accent, fontSize: 18, fontWeight: FontWeight.w800)),
       const SizedBox(height: 8), Text('No new items fit this filter yet. Finish a game or Daily Challenge to earn coins, or browse All to preview your next unlock.', style: TextStyle(color:p.muted,height:1.5)),
     ])),
+    ...storeCards(),
     card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text('REWARD GUIDE', style: TextStyle(color: p.accent, fontWeight: FontWeight.w800, letterSpacing: 1)),
       const SizedBox(height: 8), Text('Classic: 5 coins per cleared line. Journey: first clears and better stars. Sprint: completion, speed and personal bests. Daily Challenge: 120–180 coins once per UTC day.', style: TextStyle(color: p.muted, fontSize: 12, height: 1.5)),
