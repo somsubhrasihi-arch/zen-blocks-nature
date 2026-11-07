@@ -90,7 +90,7 @@ void main() {
       'practice',
       'help',
     ]);
-    await tester.tap(find.text('Home'));
+    await tester.binding.handlePopRoute();
     await tester.pump();
     expect(find.text('Play Classic'), findsOneWidget);
     expect(tester.takeException(), isNull);

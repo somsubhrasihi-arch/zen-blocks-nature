@@ -61,3 +61,12 @@ The GitHub debug APK now enables Google sample rewarded ads. Enter a Journey sta
 
 ## Version 1.11.0: quests and friend challenges
 Rotating daily focus quests, weekly missions and a fixed chest, a persistent seven-visit collection, three new rendered skins and cosmetic bundles add new goals. Optional rewarded ads offer a capped post-run 25-coin bonus or one life, with helpful failure guidance and cooldowns. Friend challenge codes and the native share sheet let players race the same Daily puzzle and share personal times. These are asynchronous manual challenges; online friend rankings and live PvP are not yet implemented. See [PLAYER_ENGAGEMENT_PLAN.md](PLAYER_ENGAGEMENT_PLAN.md) for the review, validation limits and backend roadmap.
+
+### Playful layout (1.11)
+Home now focuses on Play/Continue and Journey. Challenges contains Daily, Sprint,
+friend codes and goals; Shop stays one tap away; More contains rewards,
+achievements, practice and rules. Back from an internal tab returns Home.
+Original vector toy-block artwork, a new Block Buddies palette, softer buttons
+and rounded cards replace the crowded opening menu. Existing chosen palettes,
+progress and game rules are preserved. The visual style does not change the
+app's audience declaration or enable additional ad/purchase services.

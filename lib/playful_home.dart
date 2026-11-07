@@ -129,296 +129,304 @@ class _PlayfulHomeState extends State<PlayfulHome> {
   );
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 10, 12, 0),
-          child: Row(
-            children: [
-              TBlockMark(size: 30, color: const Color(0xFFFFCD55)),
-              const SizedBox(width: 8),
-              const Expanded(
-                child: Text(
-                  'T-BLOCK',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 23,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 1,
-                  ),
-                ),
-              ),
-              Semantics(
-                label: '${widget.coins} Block Coins',
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFE9A4),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.monetization_on_rounded,
-                        color: Color(0xFFA76100),
-                        size: 20,
-                      ),
-                      const SizedBox(width: 5),
-                      Text(
-                        '${widget.coins}',
-                        style: const TextStyle(
-                          color: ink,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              IconButton(
-                tooltip: 'Settings',
-                onPressed: widget.onSettings,
-                icon: const Icon(Icons.settings_rounded, color: Colors.white),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: SingleChildScrollView(
-            key: ValueKey('home-tab-$tab'),
-            padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 440),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (tab == 0) ...[
-                      const SizedBox(height: 4),
-                      const Text(
-                        gameTagline,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Color(0xFFFFE6FA),
-                          fontSize: 14,
-                          letterSpacing: 1,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      const Semantics(
-                        label: 'A smiling tower of colorful toy blocks',
-                        image: true,
-                        child: AspectRatio(
-                          aspectRatio: 2.2,
-                          child: CustomPaint(painter: ToyIslandPainter()),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFFFBF4),
-                          borderRadius: BorderRadius.circular(30),
-                          boxShadow: const [
-                            BoxShadow(
-                              color: Color(0x22331B53),
-                              offset: Offset(0, 7),
-                              blurRadius: 0,
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          children: [
-                            const Text(
-                              'A little play. A big smile.',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                color: ink,
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              widget.hasSave
-                                  ? 'Your game is right where you left it.'
-                                  : 'Find your flow, one block at a time.',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: secondary,
-                                fontSize: 13,
-                              ),
-                            ),
-                            const SizedBox(height: 16),
-                            playButton(
-                              widget.hasSave ? 'Continue' : 'Play Classic',
-                              widget.hasSave
-                                  ? widget.onContinue
-                                  : widget.onPlay,
-                            ),
-                            if (widget.hasSave)
-                              TextButton(
-                                onPressed: widget.loading
-                                    ? null
-                                    : widget.onPlay,
-                                child: const Text(
-                                  'Start new game',
-                                  style: TextStyle(color: ink),
-                                ),
-                              ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Your best · ${widget.best}',
-                              style: const TextStyle(
-                                color: secondary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      tile(
-                        'Journey · Stage ${widget.stage}',
-                        'Explore worlds. Collect stars.',
-                        Icons.route_rounded,
-                        const Color(0xFF7250B8),
-                        widget.onJourney,
-                      ),
-                      if (widget.showPractice)
-                        Align(
-                          child: TextButton.icon(
-                            onPressed: widget.onPractice,
-                            icon: const Icon(
-                              Icons.school_rounded,
-                              color: Colors.white,
-                              size: 19,
-                            ),
-                            label: const Text(
-                              'Practice',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                    if (tab == 1) ...[
-                      heading(
-                        'Pick a little challenge',
-                        'A fresh goal, at your own pace.',
-                      ),
-                      tile(
-                        'Daily Challenge',
-                        'One new puzzle every day.',
-                        Icons.today_rounded,
-                        const Color(0xFF167B64),
-                        widget.onDaily,
-                      ),
-                      tile(
-                        'Sprint',
-                        'Clear 40 lines. Beat your best time.',
-                        Icons.timer_rounded,
-                        const Color(0xFFCA4B2B),
-                        widget.onSprint,
-                      ),
-                      tile(
-                        'Friend challenges',
-                        'Share a puzzle. Compare your results.',
-                        Icons.people_alt_rounded,
-                        const Color(0xFF7250B8),
-                        widget.onFriends,
-                      ),
-                      tile(
-                        'Daily rewards & lives',
-                        'Daily quests, weekly missions and gifts.',
-                        Icons.card_giftcard_rounded,
-                        const Color(0xFFAD3476),
-                        widget.onRewards,
-                      ),
-                    ],
-                    if (tab == 2) ...[
-                      heading(
-                        'Your little clubhouse',
-                        'All your extras, together.',
-                      ),
-                      tile(
-                        'Daily rewards & lives',
-                        'Collect gifts and check your goals.',
-                        Icons.card_giftcard_rounded,
-                        const Color(0xFFAD3476),
-                        widget.onRewards,
-                      ),
-                      tile(
-                        'Achievements',
-                        'Celebrate your favorite milestones.',
-                        Icons.emoji_events_rounded,
-                        const Color(0xFFA76100),
-                        widget.onAchievements,
-                      ),
-                      tile(
-                        'Practice',
-                        'Learn the moves with a friendly guide.',
-                        Icons.school_rounded,
-                        const Color(0xFF167B64),
-                        widget.onPractice,
-                      ),
-                      tile(
-                        'How to play',
-                        'A quick reminder of the rules.',
-                        Icons.sports_esports_rounded,
-                        const Color(0xFF7250B8),
-                        widget.onHelp,
-                      ),
-                    ],
-                    if (widget.loading)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(12),
-                          child: CircularProgressIndicator(color: Colors.white),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-        Material(
-          color: const Color(0xFFFFFBF4),
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+    return PopScope(
+      canPop: tab == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) setState(() => tab = 0);
+      },
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 10, 12, 0),
             child: Row(
               children: [
-                nav(
-                  'Home',
-                  Icons.home_rounded,
-                  0,
-                  () => setState(() => tab = 0),
+                TBlockMark(size: 30, color: const Color(0xFFFFCD55)),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'T-BLOCK',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 23,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1,
+                    ),
+                  ),
                 ),
-                nav(
-                  'Challenges',
-                  Icons.extension_rounded,
-                  1,
-                  () => setState(() => tab = 1),
+                Semantics(
+                  label: '${widget.coins} Block Coins',
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFE9A4),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.monetization_on_rounded,
+                          color: Color(0xFFA76100),
+                          size: 20,
+                        ),
+                        const SizedBox(width: 5),
+                        Text(
+                          '${widget.coins}',
+                          style: const TextStyle(
+                            color: ink,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-                nav('Shop', Icons.shopping_bag_rounded, -1, widget.onShop),
-                nav(
-                  'More',
-                  Icons.grid_view_rounded,
-                  2,
-                  () => setState(() => tab = 2),
+                IconButton(
+                  tooltip: 'Settings',
+                  onPressed: widget.onSettings,
+                  icon: const Icon(Icons.settings_rounded, color: Colors.white),
                 ),
               ],
             ),
           ),
-        ),
-      ],
+          Expanded(
+            child: SingleChildScrollView(
+              key: ValueKey('home-tab-$tab'),
+              padding: const EdgeInsets.fromLTRB(24, 12, 24, 16),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 440),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (tab == 0) ...[
+                        const SizedBox(height: 4),
+                        const Text(
+                          gameTagline,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Color(0xFFFFE6FA),
+                            fontSize: 14,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Semantics(
+                          label: 'A smiling tower of colorful toy blocks',
+                          image: true,
+                          child: AspectRatio(
+                            aspectRatio: 2.2,
+                            child: CustomPaint(painter: ToyIslandPainter()),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFFBF4),
+                            borderRadius: BorderRadius.circular(30),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x22331B53),
+                                offset: Offset(0, 7),
+                                blurRadius: 0,
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            children: [
+                              const Text(
+                                'A little play. A big smile.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: ink,
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                widget.hasSave
+                                    ? 'Your game is right where you left it.'
+                                    : 'Find your flow, one block at a time.',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: secondary,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              playButton(
+                                widget.hasSave ? 'Continue' : 'Play Classic',
+                                widget.hasSave
+                                    ? widget.onContinue
+                                    : widget.onPlay,
+                              ),
+                              if (widget.hasSave)
+                                TextButton(
+                                  onPressed: widget.loading
+                                      ? null
+                                      : widget.onPlay,
+                                  child: const Text(
+                                    'Start new game',
+                                    style: TextStyle(color: ink),
+                                  ),
+                                ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Your best · ${widget.best}',
+                                style: const TextStyle(
+                                  color: secondary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        tile(
+                          'Journey · Stage ${widget.stage}',
+                          'Explore worlds. Collect stars.',
+                          Icons.route_rounded,
+                          const Color(0xFF7250B8),
+                          widget.onJourney,
+                        ),
+                        if (widget.showPractice)
+                          Align(
+                            child: TextButton.icon(
+                              onPressed: widget.onPractice,
+                              icon: const Icon(
+                                Icons.school_rounded,
+                                color: Colors.white,
+                                size: 19,
+                              ),
+                              label: const Text(
+                                'Practice',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                      if (tab == 1) ...[
+                        heading(
+                          'Pick a little challenge',
+                          'A fresh goal, at your own pace.',
+                        ),
+                        tile(
+                          'Daily Challenge',
+                          'One new puzzle every day.',
+                          Icons.today_rounded,
+                          const Color(0xFF167B64),
+                          widget.onDaily,
+                        ),
+                        tile(
+                          'Sprint',
+                          'Clear 40 lines. Beat your best time.',
+                          Icons.timer_rounded,
+                          const Color(0xFFCA4B2B),
+                          widget.onSprint,
+                        ),
+                        tile(
+                          'Friend challenges',
+                          'Share a puzzle. Compare your results.',
+                          Icons.people_alt_rounded,
+                          const Color(0xFF7250B8),
+                          widget.onFriends,
+                        ),
+                        tile(
+                          'Daily rewards & lives',
+                          'Daily quests, weekly missions and gifts.',
+                          Icons.card_giftcard_rounded,
+                          const Color(0xFFAD3476),
+                          widget.onRewards,
+                        ),
+                      ],
+                      if (tab == 2) ...[
+                        heading(
+                          'Your little clubhouse',
+                          'All your extras, together.',
+                        ),
+                        tile(
+                          'Daily rewards & lives',
+                          'Collect gifts and check your goals.',
+                          Icons.card_giftcard_rounded,
+                          const Color(0xFFAD3476),
+                          widget.onRewards,
+                        ),
+                        tile(
+                          'Achievements',
+                          'Celebrate your favorite milestones.',
+                          Icons.emoji_events_rounded,
+                          const Color(0xFFA76100),
+                          widget.onAchievements,
+                        ),
+                        tile(
+                          'Practice',
+                          'Learn the moves with a friendly guide.',
+                          Icons.school_rounded,
+                          const Color(0xFF167B64),
+                          widget.onPractice,
+                        ),
+                        tile(
+                          'How to play',
+                          'A quick reminder of the rules.',
+                          Icons.sports_esports_rounded,
+                          const Color(0xFF7250B8),
+                          widget.onHelp,
+                        ),
+                      ],
+                      if (widget.loading)
+                        const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(12),
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Material(
+            color: const Color(0xFFFFFBF4),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              child: Row(
+                children: [
+                  nav(
+                    'Home',
+                    Icons.home_rounded,
+                    0,
+                    () => setState(() => tab = 0),
+                  ),
+                  nav(
+                    'Challenges',
+                    Icons.extension_rounded,
+                    1,
+                    () => setState(() => tab = 1),
+                  ),
+                  nav('Shop', Icons.shopping_bag_rounded, -1, widget.onShop),
+                  nav(
+                    'More',
+                    Icons.grid_view_rounded,
+                    2,
+                    () => setState(() => tab = 2),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
