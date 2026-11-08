@@ -1,1 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 108 108"><defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#10184c"/><stop offset="1" stop-color="#090b31"/></linearGradient><linearGradient id="tile" x2="0.8" y2="1"><stop stop-color="#a1faff"/><stop offset="0.45" stop-color="#55dfff"/><stop offset="1" stop-color="#8a7cf7"/></linearGradient></defs><rect width="108" height="108" fill="url(#bg)"/><rect x="28" y="34" width="16" height="16" rx="3" fill="url(#tile)" stroke="#e9fbff" stroke-width="0.7"/><rect x="46" y="34" width="16" height="16" rx="3" fill="url(#tile)" stroke="#e9fbff" stroke-width="0.7"/><rect x="64" y="34" width="16" height="16" rx="3" fill="url(#tile)" stroke="#e9fbff" stroke-width="0.7"/><rect x="46" y="52" width="16" height="16" rx="3" fill="url(#tile)" stroke="#e9fbff" stroke-width="0.7"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 108 108">
+  <rect width="108" height="108" fill="#67419C"/>
+  <g fill="#FFCF63" stroke="#E9AE43" stroke-width="0.7">
+    <rect x="28" y="34" width="16" height="16" rx="3"/>
+    <rect x="46" y="34" width="16" height="16" rx="3"/>
+    <rect x="64" y="34" width="16" height="16" rx="3"/>
+    <rect x="46" y="52" width="16" height="16" rx="3"/>
+  </g>
+  <g fill="#FFEAAF">
+    <path d="M32 37h8v1.5h-8z M50 37h8v1.5h-8z M68 37h8v1.5h-8z M50 55h8v1.5h-8z"/>
+  </g>
+  <g fill="#41255F"><circle cx="51" cy="41" r="1"/><circle cx="59" cy="41" r="1"/></g>
+  <path d="M52 44Q55 48 58 44" fill="none" stroke="#41255F" stroke-width="0.8" stroke-linecap="round"/>
+</svg>

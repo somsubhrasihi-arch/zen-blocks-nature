@@ -1,4 +1,4 @@
-# T-Block Aurora mark
+# T-BLOCK golden buddy mark
 
 An original four-square T-piece mark. The name refers to the game's T-shaped
 piece; the app's package identity and saved data remain unchanged.
@@ -9,5 +9,5 @@ piece; the app's package identity and saved data remain unchanged.
 - `tools/configure_branding.py`: Android legacy, adaptive and monochrome icon
   resources plus display-name configuration, applied by both build workflows.
 
-The launcher icon uses the default Neon Aurora colors. Android may apply the
+The golden T has an upright smile on its top-middle block and a purple background. Android may apply the
 user's system palette to its monochrome themed-icon variant.

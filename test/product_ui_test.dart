@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -9,6 +10,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zen_blocks/arcade_ui.dart';
 import 'package:zen_blocks/customization.dart';
 import 'package:zen_blocks/game.dart';
+import 'package:zen_blocks/play_modes.dart';
+import 'package:zen_blocks/campaign.dart';
 import 'package:zen_blocks/game_audio.dart';
 import 'package:zen_blocks/main.dart';
 import 'fake_audio.dart';
@@ -73,12 +76,52 @@ void main() {
       expect(board.top - frame.top, closeTo(3, .01));
       expect(frame.bottom - board.bottom, closeTo(3, .01));
       expect(board.width / board.height, closeTo(.5, .001));
+      final rail = tester.getRect(find.byKey(const ValueKey('game-stats-rail')));
+      expect(rail.left, greaterThan(frame.right));
+      expect(rail.top, closeTo(frame.top, .01));
+      expect(rail.right, lessThanOrEqualTo(size.width - 8));
+      for (final label in ['SCORE', 'LEVEL', 'BEST', 'NEXT']) {
+        expect(tester.getCenter(find.text(label)).dx, greaterThan(frame.right));
+      }
+      // Compare against the previous top-row layout's available board height.
+      final previousHeight = size.height - 16 - 46 - 6 - 52 - 6 - 6 - 108 - 12;
+      expect(board.height, greaterThan(previousHeight));
       expect(tester.getBottomRight(find.text('DROP')).dy, lessThan(size.height));
       if (size.height == 900) expect(board.height, greaterThan(630));
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     });
   }
+
+  testWidgets('side stats support sprint, daily and journey with button controls', (tester) async {
+    await mount(tester, const Size(360, 640));
+    await tester.tap(find.text('Play Classic')); await tester.pump();
+    final dynamic state = tester.state(find.byType(GameScreen));
+    state.joystickEnabled = false;
+    state.game.reset();
+    state.game.start(playMode: PlayMode.sprint);
+    await tester.pump();
+    final frame = tester.getRect(find.byKey(const ValueKey('playing-field-frame')));
+    for (final label in ['LINES', 'TIME', 'BEST', 'NEXT']) {
+      expect(tester.getCenter(find.text(label)).dx, greaterThan(frame.right));
+    }
+    expect(find.text('LEFT'), findsOneWidget);
+    expect(find.text('RIGHT'), findsOneWidget);
+    expect(find.text('DOWN'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await capture(tester, '08-sprint-side-stats');
+    state.game.reset();
+    state.game.start(playMode: PlayMode.daily);
+    await tester.pump();
+    expect(find.text('GOAL'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    state.game.reset();
+    state.game.start(journeyStage: stageForId(1));
+    await tester.pump();
+    expect(find.text('GOAL'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   testWidgets('larger text keeps the field and controls on screen', (tester) async {
     tester.platformDispatcher.textScaleFactorTestValue = 1.5;
@@ -111,6 +154,22 @@ void main() {
         Offset((image.width-2).toDouble(), image.height/2), Offset(image.width/2, (image.height-2).toDouble())]) {
         final index = (point.dy.floor()*image.width + point.dx.floor())*4;
         expect(data.sublist(index, index+4), expected);
+      }
+      // Sample the middle of each curved rim, not just the straight sides.
+      // A mismatched inner radius used to let the cream board cut through here.
+      for (final center in [const Offset(24, 24), Offset(image.width - 24, 24),
+        Offset(24, image.height - 24), Offset(image.width - 24, image.height - 24)]) {
+        final sx = center.dx < image.width / 2 ? -1 : 1;
+        final sy = center.dy < image.height / 2 ? -1 : 1;
+        for (final angle in [math.pi / 8, math.pi / 4, 3 * math.pi / 8]) {
+          final x = (center.dx + sx * 22.5 * math.cos(angle)).floor();
+          final y = (center.dy + sy * 22.5 * math.sin(angle)).floor();
+          final index = (y * image.width + x) * 4;
+          for (var channel = 0; channel < 4; channel++) {
+            expect(data[index + channel], closeTo(expected[channel], 12),
+              reason: 'Continuous rounded rim at ($x, $y), channel $channel');
+          }
+        }
       }
       image.dispose();
     });

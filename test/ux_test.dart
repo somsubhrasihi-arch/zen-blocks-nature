@@ -42,11 +42,21 @@ void main() {
     await tester.tap(find.text('Start Sprint'));await tester.pump();await tester.pump(const Duration(milliseconds:700));await tester.pump();
     final dynamic state=tester.state(find.byType(GameScreen));
     await tester.tap(find.byTooltip('Settings'));await tester.pump();await tester.pump(const Duration(milliseconds:500));
-    expect(state.game.paused,true);final elapsed=state.game.elapsedMilliseconds;final pieceY=state.game.active.y;
+    expect(state.game.paused,true);expect(state.timer?.isActive, isNot(true));final elapsed=state.game.elapsedMilliseconds;final pieceY=state.game.active.y;
     await tester.pump(const Duration(seconds:3));expect(state.game.elapsedMilliseconds,elapsed);expect(state.game.active.y,pieceY);
     await tester.tap(find.byTooltip('Done'));await tester.pump();await tester.pump(const Duration(milliseconds:500));
     expect(find.text('Paused'),findsOneWidget);expect(find.text('Resume'),findsOneWidget);
-    await tester.tap(find.text('Resume'));await tester.pump();expect(state.game.paused,false);
+    await tester.tap(find.text('Resume'));await tester.pump();expect(state.game.paused,false);expect(state.timer.isActive,true);
+    await tester.tap(find.byTooltip('Pause')); await tester.pump();
+    await tester.ensureVisible(find.text('Home')); await tester.tap(find.text('Home')); await tester.pump();
+    expect(state.timer?.isActive, isNot(true));
+    final homeY = state.game.active.y;
+    await tester.pump(const Duration(seconds: 3));
+    expect(state.game.active.y, homeY);
+    await tester.tap(find.text('Continue')); await tester.pump();
+    expect(state.timer.isActive, true);
+    await tester.pump(Duration(milliseconds: state.game.fallMilliseconds + 1));
+    expect(state.game.active.y, greaterThan(homeY));
     await tester.pumpWidget(const SizedBox.shrink());
   });
   testWidgets('touch controls work on the actual field without breaking pause buttons',(tester)async{
