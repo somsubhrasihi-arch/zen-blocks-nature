@@ -160,7 +160,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     unawaited(monetization.initialize());
     audio = widget.audio ?? GameAudio();
     unawaited(audio.prepare());
-    aurora = AnimationController(vsync: this, duration: Duration(seconds: 8))..repeat();
+    aurora = AnimationController(vsync: this, duration: Duration(seconds: 8));
     burst = AnimationController(vsync: this, duration: Duration(milliseconds: 650))
       ..addStatusListener((status) {
         if (status == AnimationStatus.completed) _hideBurst();
