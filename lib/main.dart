@@ -521,8 +521,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     super.dispose();
   }
 
-  Widget _stat(String label, String value, {double? progressValue}) => Expanded(child: Container(
-    padding: EdgeInsets.symmetric(vertical: 5, horizontal: 8),
+  Widget _stat(String label, String value, {double? progressValue}) => Container(
+    padding: EdgeInsets.symmetric(vertical: 5, horizontal: 4),
     decoration: BoxDecoration(gradient: LinearGradient(colors: _palette.stats), borderRadius: BorderRadius.circular(14),
       border: Border.all(color: _palette.accent.withValues(alpha: .26))),
     child: Center(child: FittedBox(fit: BoxFit.scaleDown, child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -531,7 +531,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       if (progressValue != null) ...[SizedBox(height: 3), SizedBox(width: 60, child: LinearProgressIndicator(
         value: progressValue.clamp(0, 1).toDouble(), minHeight: 3, color: _palette.accent, backgroundColor: _palette.grid))],
     ]))),
-  ));
+  );
 
   Widget _control(IconData icon, String label, VoidCallback action) => Expanded(
     child: _button(label, icon, game.canMove ? () => _act(action) : null, stacked: true, height: 64,
@@ -707,6 +707,38 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     )),
   ]);
 
+  Widget _gameStats(double scale) {
+    Widget card(Widget child) => Padding(padding: const EdgeInsets.only(bottom: 6),
+      child: SizedBox(height: 56 * scale, child: child));
+    return SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      if (game.mode == PlayMode.sprint) ...[
+        card(_stat('Lines', '${game.lines}/40', progressValue: game.lines / 40)),
+        card(Container(padding: const EdgeInsets.symmetric(horizontal: 4),
+          decoration: BoxDecoration(color: _palette.panel, borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: _palette.accent.withValues(alpha: .26))),
+          child: Center(child: FittedBox(fit: BoxFit.scaleDown, child: Column(mainAxisSize: MainAxisSize.min, children: [
+            Text('TIME', style: TextStyle(color: _palette.muted, fontSize: 8, letterSpacing: 1.5)),
+            SprintTimeText(game: game),
+          ]))))),
+        card(_stat('Best', progress.data.sprintBestMs == 0 ? '—' : formatRunTime(progress.data.sprintBestMs))),
+      ] else ...[
+        card(_stat('Score', '${game.score}')),
+        card(_stat('Level', '${game.level}')),
+        card(_stat(game.mode == PlayMode.classic ? 'Best' : 'Goal',
+          game.mode == PlayMode.classic ? '$highScore' : '${game.goalProgress}/${game.goalTarget}',
+          progressValue: game.goalTarget > 0 ? game.goalProgress / game.goalTarget : null)),
+      ],
+      Container(height: 72 * scale, padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(color: _palette.panel, borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: _palette.accent.withValues(alpha: .26))),
+        child: Column(children: [
+          Text('NEXT', style: TextStyle(color: _palette.muted, fontSize: 8, letterSpacing: 1.2)),
+          Expanded(child: CustomPaint(painter: NextPainter(game.nextKind, palette: _palette,
+            skin: progress.data.skin), size: Size.infinite)),
+        ])),
+    ]));
+  }
+
   Widget _buildGame() => LayoutBuilder(builder: (context, constraints) {
     final scale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.5).toDouble();
     return Padding(padding: EdgeInsets.all(8), child: Column(children: [
@@ -723,31 +755,21 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
           onPressed: () { final resume = game.paused; game.togglePause(); if (resume) _scheduleTick(); }, palette: _palette),
       ])),
       SizedBox(height: 6),
-      SizedBox(height: 52 * scale, child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        if (game.mode == PlayMode.sprint) ...[
-          _stat('Lines', '${game.lines}/40', progressValue: game.lines/40), SizedBox(width: 6),
-          Expanded(child: Container(padding: EdgeInsets.symmetric(horizontal: 4),
-            decoration: BoxDecoration(color: _palette.panel, borderRadius: BorderRadius.circular(14), border: Border.all(color: _palette.accent.withValues(alpha: .26))),
-            child: Center(child: FittedBox(fit: BoxFit.scaleDown, child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Text('TIME', style: TextStyle(color: _palette.muted, fontSize: 8, letterSpacing: 1.5)), SprintTimeText(game: game),
-            ]))))), SizedBox(width: 6),
-          _stat('Best', progress.data.sprintBestMs == 0 ? '—' : formatRunTime(progress.data.sprintBestMs)),
-        ] else ...[
-          _stat('Score', '${game.score}'), SizedBox(width: 6), _stat('Level', '${game.level}'), SizedBox(width: 6),
-          _stat(game.mode == PlayMode.classic ? 'Best' : 'Goal', game.mode == PlayMode.classic ? '$highScore' : '${game.goalProgress}/${game.goalTarget}',
-            progressValue: game.goalTarget > 0 ? game.goalProgress/game.goalTarget : null),
-        ], SizedBox(width: 6),
-        Container(width: 52, padding: EdgeInsets.all(4), decoration: BoxDecoration(color: _palette.panel,
-          borderRadius: BorderRadius.circular(14), border: Border.all(color: _palette.accent.withValues(alpha: .26))),
-          child: Column(children: [Text('NEXT', style: TextStyle(color: _palette.muted, fontSize: 8, letterSpacing: 1.2)),
-            Expanded(child: CustomPaint(painter: NextPainter(game.nextKind, palette: _palette, skin: progress.data.skin), size: Size.infinite)),
-          ])),
-      ])),
-      SizedBox(height: 6),
       Expanded(child: LayoutBuilder(builder: (context, boardSpace) {
-        final width = math.min(boardSpace.maxWidth - 12, (boardSpace.maxHeight - 6) / 2).clamp(40.0, 1000.0).toDouble();
-        return Center(child: Padding(padding: EdgeInsets.all(6), child: SizedBox(width: width,
-          child: GameBoardFrame(palette: _palette, child: AspectRatio(aspectRatio: boardWidth / boardHeight, child: _boardContents())))));
+        final railWidth = math.max(56 * scale, boardSpace.maxWidth * .14);
+        const gap = 6.0;
+        // Include the frame in the fit, preserving square cells inside it.
+        final width = math.min(boardSpace.maxWidth - railWidth - gap,
+          (boardSpace.maxHeight - 6) * boardWidth / boardHeight + 6);
+        final height = (width - 6) * boardHeight / boardWidth + 6;
+        return Center(child: SizedBox(height: height, child: Row(
+          mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+            SizedBox(width: width, child: GameBoardFrame(palette: _palette,
+              child: AspectRatio(aspectRatio: boardWidth / boardHeight, child: _boardContents()))),
+            SizedBox(width: gap),
+            SizedBox(key: const ValueKey('game-stats-rail'), width: railWidth,
+              child: _gameStats(scale)),
+          ])));
       })),
       SizedBox(height: 6),
       SizedBox(height: joystickEnabled ? 108 : 64, child: Row(children: [
