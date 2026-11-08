@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -153,6 +154,22 @@ void main() {
         Offset((image.width-2).toDouble(), image.height/2), Offset(image.width/2, (image.height-2).toDouble())]) {
         final index = (point.dy.floor()*image.width + point.dx.floor())*4;
         expect(data.sublist(index, index+4), expected);
+      }
+      // Sample the middle of each curved rim, not just the straight sides.
+      // A mismatched inner radius used to let the cream board cut through here.
+      for (final center in [const Offset(24, 24), Offset(image.width - 24, 24),
+        Offset(24, image.height - 24), Offset(image.width - 24, image.height - 24)]) {
+        final sx = center.dx < image.width / 2 ? -1 : 1;
+        final sy = center.dy < image.height / 2 ? -1 : 1;
+        for (final angle in [math.pi / 8, math.pi / 4, 3 * math.pi / 8]) {
+          final x = (center.dx + sx * 22.5 * math.cos(angle)).floor();
+          final y = (center.dy + sy * 22.5 * math.sin(angle)).floor();
+          final index = (y * image.width + x) * 4;
+          for (var channel = 0; channel < 4; channel++) {
+            expect(data[index + channel], closeTo(expected[channel], 12),
+              reason: 'Continuous rounded rim at ($x, $y), channel $channel');
+          }
+        }
       }
       image.dispose();
     });

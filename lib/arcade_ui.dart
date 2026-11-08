@@ -103,6 +103,7 @@ class ArcadeIconButton extends StatelessWidget {
 
 /// The three-pixel frame has its own layout space. Board painting and clipped
 /// overlays can never draw over it, including at the rounded corners.
+/// Concentric inner and outer curves keep the rim the same width on each arc.
 class GameBoardFrame extends StatelessWidget {
   const GameBoardFrame({super.key, required this.palette, required this.child});
   final GamePalette palette;
@@ -110,9 +111,11 @@ class GameBoardFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) => RepaintBoundary(key: const ValueKey('board-frame-capture'),
     child: Container(key: const ValueKey('playing-field-frame'), padding: const EdgeInsets.all(3),
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(color: palette.accent, borderRadius: BorderRadius.circular(24),
         boxShadow: [BoxShadow(color: palette.accent.withValues(alpha: .22), blurRadius: 10, spreadRadius: 1)]),
-      child: ClipRRect(borderRadius: BorderRadius.circular(15),
+      // Inner radius = outer radius (24) minus the three-pixel rim.
+      child: ClipRRect(borderRadius: BorderRadius.circular(21), clipBehavior: Clip.antiAlias,
         child: ColoredBox(color: palette.board, child: child)),
     ));
 }
