@@ -116,6 +116,24 @@ class _AdventureHubState extends State<AdventureHub> {
     useSafeArea: true, isScrollControlled: true, showDragHandle: true,
     builder: (context) => AnimatedBuilder(animation: widget.monetization ?? widget.progress,
       builder: (_, child) => SingleChildScrollView(padding: const EdgeInsets.all(18), child: Column(mainAxisSize: MainAxisSize.min, children: storeCards()))));
+  Future<void> confirmRefill() async {
+    if (busy) return;
+    setState(() => busy = true);
+    try {
+      final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Refill Journey lives?'),
+        content: const Text('Spend 150 Block Coins to refill to 5 lives? You can also wait for free lives or play Classic, Sprint and Daily Challenge.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Keep coins')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Spend 150 coins')),
+        ],
+      ));
+      if (confirmed != true || !mounted) return;
+      final refilled = await widget.progress.refillWithCoins();
+      message(refilled ? 'Lives full. Ready for your next adventure!' : 'No coins spent. Your lives or coin balance have changed.');
+    } catch (_) { message('Could not save your refill. Please try again.'); }
+    finally { if (mounted) setState(() => busy = false); }
+  }
   List<Widget> bundles() => [
     Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text('STYLE COLLECTIONS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800))),
     for (final bundle in shopBundles.where((b) => shopFilter == 'Owned' ? b.priceFor(data.owned) == 0 : shopFilter == 'Affordable' ? b.priceFor(data.owned) > 0 && b.priceFor(data.owned) <= data.coins : true)) card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -125,7 +143,7 @@ class _AdventureHubState extends State<AdventureHub> {
       const SizedBox(height: 8), Text('20% less than the individual coin prices. You only pay for items you do not own.', style: TextStyle(color: p.muted, fontSize: 12)),
       const SizedBox(height: 12), button(bundle.priceFor(data.owned) == 0 ? 'Owned' : 'Unlock collection', Icons.collections_rounded,
         busy || bundle.priceFor(data.owned) == 0 || data.coins < bundle.priceFor(data.owned) ? null : () => buyBundle(bundle)),
-      if (data.coins < bundle.priceFor(data.owned)) TextButton(onPressed: coinPacks, child: const Text('View coin packs')),
+      if (widget.monetization?.billingConfigured == true && data.coins < bundle.priceFor(data.owned)) TextButton(onPressed: coinPacks, child: const Text('View coin packs')),
     ])),
   ];
 
@@ -220,6 +238,7 @@ class _AdventureHubState extends State<AdventureHub> {
   ];
   List<Widget> storeCards() {
     final service = widget.monetization;
+    if (service == null || !service.billingConfigured) return [];
     return [card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text('Coin packs', style: TextStyle(color: p.accent, fontSize: 22, fontWeight: FontWeight.w800)),
       const SizedBox(height: 8), Text('Use coins for new looks or a Journey life refill. All purchases are optional.', style: TextStyle(color: p.muted)),
@@ -248,16 +267,18 @@ class _AdventureHubState extends State<AdventureHub> {
         const SizedBox(height: 10), Row(children: [for (var i = 0; i < 5; i++) Padding(padding: const EdgeInsets.only(right: 8), child: Icon(i < lives ? Icons.favorite_rounded : Icons.favorite_border_rounded, color: p.blocks[4], size: 30))]),
         const SizedBox(height: 10), Text(lives == 5 ? 'Lives full. Your next adventure is ready.' : 'Next free life in ${remaining.inMinutes.toString().padLeft(2, '0')}:${(remaining.inSeconds % 60).toString().padLeft(2, '0')}', style: TextStyle(color: p.muted)),
         const SizedBox(height: 8), Text('A life is reserved when a stage starts and returned when you win. Resume for free; a restart uses another life. Free lives refill every 30 minutes. Other modes need no lives.', style: TextStyle(color: p.muted, fontSize: 12, height: 1.5)),
-        const SizedBox(height: 12), button('Refill to 5 · 150 coins', Icons.favorite_rounded, busy || lives == 5 || data.coins < 150 ? null : () => perform(() => widget.progress.refillWithCoins())),
-        const SizedBox(height: 8), button(lifeCap ? 'Today’s ad lives collected' : retry > 0 ? 'Retry ad in ${retry + 1}s' : service?.hasAdFailure == true ? 'Retry ad · +1 life' : service?.usingTestAds == true ? 'Watch test ad · +1 life' : 'Watch an ad · +1 life', Icons.ondemand_video_rounded,
-          busy || lives == 5 || lifeCap || service == null || !service.adsConfigured || !service.canRequestAd ? null : () => perform(() => service.watchForLife(canShow: () => mounted && tab == 3 && ModalRoute.of(context)?.isCurrent == true))),
-        const SizedBox(height: 8), Text(service?.adsConfigured == true ? service!.adStatus : 'Rewarded ads are not available in this build.', style: TextStyle(color: p.muted, fontSize: 12)),
-        const SizedBox(height: 6), Text('${data.adCount(today)}/5 optional ad lives collected today', style: TextStyle(color: p.muted, fontSize: 11)),
-        if (service?.hasAdFailure == true) TextButton(onPressed: () => showAdHelp(context), child: const Text('Help with ads')),
-        if (kDebugMode && service?.adDiagnostic != null) ExpansionTile(title: const Text('Ad test details'), childrenPadding: const EdgeInsets.all(12),
-          children: [SelectableText(service!.adDiagnostic!, style: TextStyle(color: p.muted, fontSize: 12))]),
-        if (service?.privacyOptionsRequired == true) TextButton(onPressed: service!.privacyOptions, child: const Text('Ad privacy choices')),
-        TextButton(onPressed: coinPacks, child: const Text('Get coin packs')),
+        const SizedBox(height: 12), button('Refill to 5 · 150 coins', Icons.favorite_rounded, busy || lives == 5 || data.coins < 150 ? null : confirmRefill),
+        if (service?.adsConfigured == true) ...[
+          const SizedBox(height: 8), button(lifeCap ? 'Today’s ad lives collected' : retry > 0 ? 'Retry ad in ${retry + 1}s' : service?.hasAdFailure == true ? 'Retry ad · +1 life' : service?.usingTestAds == true ? 'Watch test ad · +1 life' : 'Watch an ad · +1 life', Icons.ondemand_video_rounded,
+            busy || lives == 5 || lifeCap || service == null || !service.adsConfigured || !service.canRequestAd ? null : () => perform(() => service.watchForLife(canShow: () => mounted && tab == 3 && ModalRoute.of(context)?.isCurrent == true))),
+          const SizedBox(height: 8), Text(service!.adStatus, style: TextStyle(color: p.muted, fontSize: 12)),
+          const SizedBox(height: 6), Text('${data.adCount(today)}/5 optional ad lives collected today', style: TextStyle(color: p.muted, fontSize: 11)),
+          if (service?.hasAdFailure == true) TextButton(onPressed: () => showAdHelp(context), child: const Text('Help with ads')),
+          if (kDebugMode && service?.adDiagnostic != null) ExpansionTile(title: const Text('Ad test details'), childrenPadding: const EdgeInsets.all(12),
+            children: [SelectableText(service!.adDiagnostic!, style: TextStyle(color: p.muted, fontSize: 12))]),
+          if (service?.privacyOptionsRequired == true) TextButton(onPressed: service!.privacyOptions, child: const Text('Ad privacy choices')),
+        ],
+        if (service?.billingConfigured == true) TextButton(onPressed: coinPacks, child: const Text('Get coin packs')),
       ])),
       Wrap(spacing: 10, children: [for (final period in ['Daily', 'Weekly']) ChoiceChip(label: Text(period), selected: rewardPeriod == period,
         selectedColor: p.accent.withValues(alpha: .25), onSelected: (_) => setState(() => rewardPeriod = period))]),

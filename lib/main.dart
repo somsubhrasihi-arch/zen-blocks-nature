@@ -225,6 +225,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   }
 
   void _onGameChanged() {
+    if (!game.canMove) timer?.cancel();
     if (game.lines > lastLines) {
       if (effectsEnabled && _motionAllowed && _foreground && !game.paused) {
         burstVisible = true;
@@ -275,6 +276,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
 
   void _scheduleTick() {
     timer?.cancel();
+    if (_home || !_foreground || !game.canMove) return;
     timer = Timer(Duration(milliseconds: game.fallMilliseconds), () {
       if (mounted) {
         game.tick();

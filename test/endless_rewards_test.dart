@@ -130,7 +130,9 @@ void main() {
       progress: store, monetization: service, onStage: (_) {}, initialTab: 3))));
     await tester.pump();
     expect(find.text('Journey lives · 5 / 5'), findsOneWidget);
-    expect(find.text('Rewarded ads are not available in this build.'), findsOneWidget);
+    expect(find.text('Rewarded ads are not available in this build.'), findsNothing);
+    expect(find.text('Watch an ad · +1 life'), findsNothing);
+    expect(find.text('Get coin packs'), findsNothing);
     await capture(tester, '24-daily-rewards-lives');
     await tester.scrollUntilVisible(find.text('Your daily gift'), 250, scrollable: find.byType(Scrollable).first);
     await tester.pump();
@@ -143,4 +145,29 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink()); service.dispose(); store.dispose();
   });
 
+  testWidgets('life refill requires confirmation and preserves coins on cancel', (tester) async {
+    final store = ProgressStore(); await store.load();
+    await store.grantVerifiedPurchase('refill-test', 'tblock_coins_500');
+    await store.beginJourney('refill-stage');
+    await tester.binding.setSurfaceSize(const Size(412, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(MaterialApp(home: AdventureHub(palette: neonPalette,
+      progress: store, onStage: (_) {}, initialTab: 3)));
+    await tester.pump();
+    await tester.tap(find.text('Refill to 5 · 150 coins'));
+    await tester.pumpAndSettle();
+    expect(store.data.coins, 500);
+    expect(store.data.lives, 4);
+    await tester.tap(find.text('Keep coins')); await tester.pumpAndSettle();
+    expect(store.data.coins, 500);
+    expect(store.data.lives, 4);
+    await tester.tap(find.text('Refill to 5 · 150 coins')); await tester.pumpAndSettle();
+    await tester.tap(find.text('Spend 150 coins')); await tester.pumpAndSettle();
+    final restored = ProgressStore(); await restored.load();
+    expect(restored.data.coins, 350);
+    expect(restored.data.lives, 5);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    store.dispose(); restored.dispose();
+  });
 }
