@@ -7,8 +7,8 @@ import 'package:zen_blocks/main.dart';
 import 'package:zen_blocks/game_audio.dart';
 import 'fake_audio.dart';
 
-Future<void> mountGame(WidgetTester tester) async {
-  SharedPreferences.setMockInitialValues({});
+Future<void> mountGame(WidgetTester tester, {String themeId = 'toy'}) async {
+  SharedPreferences.setMockInitialValues({'themeId': themeId});
   await tester.binding.setSurfaceSize(const Size(412, 900));
   addTearDown(() => tester.binding.setSurfaceSize(null));
   await tester.pumpWidget(ZenBlocksApp(audio: GameAudio(backend: FakeAudioBackend())));
@@ -90,7 +90,7 @@ void main() {
   });
 
   testWidgets('aurora moves without rebuilding the board and respects effects setting', (tester) async {
-    await mountGame(tester);
+    await mountGame(tester, themeId: 'neon');
     final board = find.byWidgetPredicate((w) => w is CustomPaint && w.painter is BoardPainter);
     final before = tester.widget(board);
     final aurora = tester.widgetList<CustomPaint>(find.byType(CustomPaint))

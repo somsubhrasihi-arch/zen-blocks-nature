@@ -105,7 +105,8 @@ void main() {
       final boundary = tester.renderObject<RenderRepaintBoundary>(find.byKey(const ValueKey('board-frame-capture')));
       final image = await boundary.toImage();
       final data = (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!.buffer.asUint8List();
-      final expected = [56, 216, 255, 255];
+      final accent = tester.widget<GameBoardFrame>(find.byType(GameBoardFrame)).palette.accent;
+      final expected = [(accent.r * 255).round(), (accent.g * 255).round(), (accent.b * 255).round(), 255];
       for (final point in [Offset(image.width/2, 1), Offset(1, image.height/2),
         Offset((image.width-2).toDouble(), image.height/2), Offset(image.width/2, (image.height-2).toDouble())]) {
         final index = (point.dy.floor()*image.width + point.dx.floor())*4;

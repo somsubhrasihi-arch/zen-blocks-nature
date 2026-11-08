@@ -103,6 +103,7 @@ void main() {
     await tester.pump();
     expect(find.text('Continue'), findsOneWidget);
     expect(state.game.paused, true);
+    await tester.ensureVisible(find.text('Start new game'));
     await tester.tap(find.text('Start new game'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));

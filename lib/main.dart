@@ -778,7 +778,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   Widget build(BuildContext context) => Theme(data: _themeData, child: PopScope(canPop: _home,
     onPopInvokedWithResult: (didPop, result) { if (!didPop) _returnHome(); },
     child: Scaffold(body: Container(
-      decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: _palette.background)),
+      decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: _home ? toyPalette.background : _palette.background)),
       child: Stack(children: [
         Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: _home || _palette.id == 'toy' ? const PlayfulBackdrop() : AuroraPainter(aurora, game.level, effectsEnabled && _motionAllowed, palette: _palette))))),
         SafeArea(child: _home ? _buildHome() : _buildGame()),

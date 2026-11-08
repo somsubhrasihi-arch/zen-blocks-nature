@@ -216,9 +216,16 @@ class _PlayfulHomeState extends State<PlayfulHome> {
                         Semantics(
                           label: 'A smiling tower of colorful toy blocks',
                           image: true,
-                          child: AspectRatio(
-                            aspectRatio: 2.2,
-                            child: CustomPaint(painter: ToyIslandPainter()),
+                          child: SizedBox(
+                            height: MediaQuery.sizeOf(context).height < 700
+                                ? 100
+                                : 160,
+                            child: const Center(
+                              child: AspectRatio(
+                                aspectRatio: 1.8,
+                                child: CustomPaint(painter: ToyIslandPainter()),
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(height: 10),
