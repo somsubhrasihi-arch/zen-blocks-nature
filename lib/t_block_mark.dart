@@ -68,7 +68,7 @@ class BuddyMarkPainter extends CustomPainter {
         ),
         Paint()..color = const Color(0xFFFFEDB1),
       );
-      if (i == 3) {
+      if (i == 1) {
         final ink = Paint()..color = const Color(0xFF41255F);
         canvas.drawCircle(
           at + Offset(unit * .31, unit * .48),

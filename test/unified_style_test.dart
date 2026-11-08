@@ -23,7 +23,7 @@ void main() {
       }
     },
   );
-  testWidgets('golden buddy has a top bar and downward stem', (tester) async {
+  testWidgets('golden buddy smiles from the top-middle tile', (tester) async {
     const key = ValueKey('brand-capture');
     await tester.pumpWidget(
       const MaterialApp(
@@ -54,6 +54,19 @@ void main() {
       expect(alpha(48, 65), 255);
       expect(alpha(18, 65), 0);
       expect(alpha(78, 65), 0);
+      int inkPixels(int top) {
+        var count = 0;
+        for (var y = top; y < top + 28; y++) {
+          for (var x = 36; x < 64; x++) {
+            final offset = (y * image.width + x) * 4;
+            if (bytes[offset] < 100 && bytes[offset + 1] < 80 &&
+                bytes[offset + 2] < 140 && bytes[offset + 3] > 200) count++;
+          }
+        }
+        return count;
+      }
+      expect(inkPixels(21), greaterThan(8));
+      expect(inkPixels(51), 0);
       image.dispose();
     });
   });

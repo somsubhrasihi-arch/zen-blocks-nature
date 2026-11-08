@@ -33,10 +33,10 @@ def tile(x, y):
 
 paths = ''.join(f'<path android:fillColor="{color}" android:strokeColor="#E9AE43" android:strokeWidth="0.7" android:pathData="{tile(x,y)}"/>' for x,y,color in tiles)
 # The top bar and downward stem rotate the original home buddy by 180 degrees.
-# Eyes and smile stay upright, with generous adaptive-icon safe-area padding.
+# Eyes and smile sit upright on the top-middle tile, inside the icon safe area.
 paths += ''.join(f'<path android:fillColor="#FFEAAF" android:pathData="M{x+4},{y+3}h8v1.5h-8z"/>' for x,y,_ in tiles)
-paths += '<path android:fillColor="#41255F" android:pathData="M50,59a1,1 0,1 0,2 0a1,1 0,1 0,-2 0M58,59a1,1 0,1 0,2 0a1,1 0,1 0,-2 0"/>'
-paths += '<path android:fillColor="#00000000" android:strokeColor="#41255F" android:strokeWidth="0.8" android:strokeLineCap="round" android:pathData="M52,62Q55,66 58,62"/>'
+paths += '<path android:fillColor="#41255F" android:pathData="M50,41a1,1 0,1 0,2 0a1,1 0,1 0,-2 0M58,41a1,1 0,1 0,2 0a1,1 0,1 0,-2 0"/>'
+paths += '<path android:fillColor="#00000000" android:strokeColor="#41255F" android:strokeWidth="0.8" android:strokeLineCap="round" android:pathData="M52,44Q55,48 58,44"/>'
 background = '<path android:fillColor="#67419C" android:pathData="M0,0h108v108h-108z"/>'
 
 def vector(contents):
