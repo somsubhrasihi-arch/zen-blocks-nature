@@ -11,6 +11,7 @@ import 'customization.dart';
 import 't_block_mark.dart';
 import 'arcade_ui.dart';
 import 'playful_home.dart';
+import 'playful_style.dart';
 import 'campaign.dart';
 import 'progress_store.dart';
 import 'journey_ui.dart';
@@ -36,7 +37,7 @@ void main() {
 
 const forest = Color(0xFF050B28);
 const panel = Color(0xFF121947);
-const cream = Color(0xFFF6F5FF);
+const cream = buddyInk;
 const muted = Color(0xFFA9B9EE);
 const blockColors = <Color>[
   Color(0xFF00DFFF), Color(0xFFFFC247), Color(0xFFE250FF),
@@ -51,8 +52,7 @@ class ZenBlocksApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
         title: appDisplayName,
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(useMaterial3: true, brightness: Brightness.dark, fontFamily: 'Roboto',
-          scaffoldBackgroundColor: forest, colorSchemeSeed: const Color(0xFF9ECFC0)),
+        theme: buddyTheme(toyPalette.playful),
         home: GameScreen(audio: audio),
       );
 }
@@ -81,14 +81,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   final ZenGame game = ZenGame();
   late final GameAudio audio;
   bool musicEnabled = true;
-  GamePalette _palette = toyPalette;
+  GamePalette _palette = toyPalette.playful;
   String _musicTrack = 'aurora';
-  ThemeData get _themeData => ThemeData(useMaterial3: true, brightness: Brightness.dark,
-    scaffoldBackgroundColor: _palette.background.first, colorSchemeSeed: _palette.accent,
-    fontFamily: 'Roboto', sliderTheme: SliderThemeData(trackHeight: 5,
-      activeTrackColor: _palette.accent, inactiveTrackColor: _palette.accent.withValues(alpha: .16),
-      thumbColor: _palette.accent, thumbShape: RoundSliderThumbShape(enabledThumbRadius: 8),
-      overlayShape: RoundSliderOverlayShape(overlayRadius: 16)));
+  ThemeData get _themeData => buddyTheme(_palette);
   double musicVolume = .28, effectsVolume = .8;
   int joystickRepeat = 120;
   final SessionStore sessions = SessionStore();
@@ -165,7 +160,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     unawaited(monetization.initialize());
     audio = widget.audio ?? GameAudio();
     unawaited(audio.prepare());
-    aurora = AnimationController(vsync: this, duration: Duration(seconds: 8))..repeat();
+    aurora = AnimationController(vsync: this, duration: Duration(seconds: 8));
     burst = AnimationController(vsync: this, duration: Duration(milliseconds: 650))
       ..addStatusListener((status) {
         if (status == AnimationStatus.completed) _hideBurst();
@@ -194,7 +189,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       highScore = prefs.getInt('highScore') ?? 0;
       soundEnabled = prefs.getBool('soundEnabled') ?? true;
       musicEnabled = prefs.getBool('musicEnabled') ?? true;
-      _palette = paletteForId(prefs.getString('themeId'));
+      _palette = paletteForId(prefs.getString('themeId')).playful;
       _musicTrack = trackForId(prefs.getString('musicTrack')).id;
       vibrationEnabled = prefs.getBool('vibrationEnabled') ?? true;
       effectsEnabled = prefs.getBool('effectsEnabled') ?? true;
@@ -459,7 +454,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
             Text(challenge.name, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
             SizedBox(height: 8), Text(challenge.objective, style: TextStyle(color: _palette.accent, fontSize: 20, fontWeight: FontWeight.w800)),
             SizedBox(height: 12), Text('$today · Resets at 00:00 UTC\nNext challenge in ${remaining.inHours}h ${remaining.inMinutes % 60}m', style: TextStyle(color: _palette.muted, height: 1.5)),
-            SizedBox(height: 12), Text(claimable ? 'Today’s reward: 120 coins + streak bonus' : 'Today’s reward collected · Replays are practice', style: TextStyle(color: _palette.blocks[1], fontWeight: FontWeight.w700)),
+            SizedBox(height: 12), Text(claimable ? 'Today’s reward: 120 coins + streak bonus' : 'Today’s reward collected · Replays are practice', style: TextStyle(color: buddyGold, fontWeight: FontWeight.w700)),
             SizedBox(height: 8), Text('Current streak: ${progress.data.activeDailyStreak(today)} days. Consecutive completions add +10 coins per day, up to +60. Everyone starts with the same daily board and piece sequence.', style: TextStyle(color: _palette.muted, height: 1.5)),
           ],
           SizedBox(height: 18),
@@ -479,7 +474,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   void _syncAnimations() {
     final animate = effectsEnabled && _motionAllowed && _foreground && !game.paused;
     if (animate) {
-      if (!aurora.isAnimating) aurora.repeat();
+      aurora.stop(); // Shared backdrop is static; effects animate only when earned.
       if (burstVisible && burst.value > 0 && burst.value < 1 && !burst.isAnimating) {
         burst.forward();
       }
@@ -598,7 +593,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
                       margin: EdgeInsets.only(left: 3), width: 10, height: 14,
                       decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(3)))),
                   ]))).toList(),
-                  onChanged: (id) { if (id == null) return; update(() => _palette = paletteForId(id)); setState(() {}); _saveSettings(); }),
+                  onChanged: (id) { if (id == null) return; update(() => _palette = paletteForId(id).playful); setState(() {}); _saveSettings(); }),
                 SizedBox(height: 6),
                 _settingToggle('Reduce motion', Icons.motion_photos_off_rounded, reduceMotion, (v) {
                   update(() => reduceMotion = v); setState(() {}); _syncAnimations(); _saveSettings();
@@ -656,7 +651,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     if (burstVisible && effectsEnabled && _motionAllowed && game.canMove) Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: SparkPainter(burst, palette: _palette, effect: progress.data.effect))))),
     if (game.paused || game.over || game.completed) Positioned.fill(child: ColoredBox(color: _palette.overlay,
       child: Center(child: SingleChildScrollView(child: Padding(padding: EdgeInsets.all(16), child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Icon(game.completed || game.over ? Icons.emoji_events_rounded : Icons.pause_circle_rounded, color: _palette.blocks[1], size: 34),
+        Icon(game.completed || game.over ? Icons.emoji_events_rounded : Icons.pause_circle_rounded, color: buddyGold, size: 34),
         SizedBox(height: 8),
         Text(game.completed ? (game.mode == PlayMode.sprint ? 'Sprint complete!' : game.mode == PlayMode.daily ? 'Challenge complete!' : 'Stage complete!') : game.over ? (game.mode == PlayMode.classic ? 'Nice run!' : 'Try again!') : 'Paused',
           textAlign: TextAlign.center, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
@@ -666,7 +661,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
           textAlign: TextAlign.center, style: TextStyle(color: _palette.muted, fontSize: 12)),
         if (game.completed && game.stage != null) ...[
           SizedBox(height: 6), Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            for (var i = 0; i < 3; i++) Icon(i < game.earnedStars ? Icons.star_rounded : Icons.star_outline_rounded, color: _palette.blocks[1], size: 30),
+            for (var i = 0; i < 3; i++) Icon(i < game.earnedStars ? Icons.star_rounded : Icons.star_outline_rounded, color: buddyGold, size: 30),
           ]),
         ],
         if (game.over || game.completed) ...[
@@ -676,7 +671,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
           SizedBox(height: 8),
           if (_settling) Text('Saving rewards…', style: TextStyle(color: _palette.muted, fontSize: 12)),
           if (_runReward != null) ...[
-            Text('+${_runReward!.coins} Block Coins', textAlign: TextAlign.center, style: TextStyle(color: _palette.blocks[1], fontWeight: FontWeight.w800)),
+            Text('+${_runReward!.coins} Block Coins', textAlign: TextAlign.center, style: TextStyle(color: buddyGold, fontWeight: FontWeight.w800)),
             Text('Wallet · ${progress.data.coins} coins', style: TextStyle(color: _palette.muted, fontSize: 12)),
             TextButton(onPressed: () => setState(() => _rewardDetailsExpanded = !_rewardDetailsExpanded),
               child: Text(_rewardDetailsExpanded ? 'Hide reward details' : 'Reward details', style: TextStyle(color: _palette.accent))),
@@ -718,9 +713,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       SizedBox(height: 46 * scale, child: Row(children: [
         TBlockMark(size: 30, color: _palette.accent), SizedBox(width: 8),
         Expanded(child: Column(mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('T-BLOCK', style: TextStyle(fontSize: 21, letterSpacing: 1.8, fontWeight: FontWeight.w900)),
+          Text('T-BLOCK', style: TextStyle(color: Colors.white, fontSize: 21, letterSpacing: 1.8, fontWeight: FontWeight.w900)),
           Text(game.mode == PlayMode.classic ? gameTagline : '${game.modeLabel} · ${game.objective}',
-            maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: _palette.muted, fontSize: 9, letterSpacing: .2)),
+            maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white, fontSize: 9, letterSpacing: .2)),
         ])),
         ArcadeIconButton(tooltip: 'Settings', icon: Icons.tune_rounded, onPressed: _showSettings, palette: _palette),
         SizedBox(width: 8),
@@ -780,7 +775,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
     child: Scaffold(body: Container(
       decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: _home ? toyPalette.background : _palette.background)),
       child: Stack(children: [
-        Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: _home || _palette.id == 'toy' ? const PlayfulBackdrop() : AuroraPainter(aurora, game.level, effectsEnabled && _motionAllowed, palette: _palette))))),
+        Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: const PlayfulBackdrop())))),
         SafeArea(child: _home ? _buildHome() : _buildGame()),
       ]),
     )),
@@ -800,7 +795,7 @@ class BoardPainter extends CustomPainter {
     final h = size.height / boardHeight;
     final landing = ghost;
     if (landing != null) {
-      final color = palette.blocks[landing.kind];
+      final color = Color.lerp(palette.blocks[landing.kind], buddyInk, .5)!;
       for (var row = 0; row < landing.cells.length; row++) {
         for (var col = 0; col < landing.cells[row].length; col++) {
           final x = landing.x + col, y = landing.y + row;
@@ -819,7 +814,7 @@ class BoardPainter extends CustomPainter {
         final v = cells[y][x];
         if (v > 0) drawBlock(canvas, rect.deflate(1), palette.blocks[v - 1], skin: skin);
         if (markedRows.contains(y) && x == 0) {
-          canvas.drawCircle(Offset(rect.left + 4, rect.center.dy), 2, Paint()..color = Colors.white);
+          canvas.drawCircle(Offset(rect.left + 4, rect.center.dy), 2, Paint()..color = buddyInk);
         }
       }
     }

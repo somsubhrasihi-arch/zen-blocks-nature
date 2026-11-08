@@ -3,6 +3,7 @@ import 'arcade_ui.dart';
 import 'board_touch.dart';
 import 'cosmetic_paint.dart';
 import 'customization.dart';
+import 'playful_style.dart';
 import 'game.dart';
 
 class PracticeScreen extends StatefulWidget {
@@ -17,7 +18,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
   int step = 0;
   bool done = false;
   String? hint;
-  GamePalette get p => widget.palette;
+  GamePalette get p => widget.palette.playful;
   @override
   void initState() { super.initState(); setup(); }
   void setup() {
@@ -47,7 +48,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
   @override
   void dispose() { game.dispose(); super.dispose(); }
   @override
-  Widget build(BuildContext context) => Scaffold(backgroundColor: p.background.first,
+  Widget build(BuildContext context) => Theme(data: buddyTheme(p), child: Scaffold(backgroundColor: p.panel,
     appBar: AppBar(backgroundColor: p.panel, title: const Text('Practice'),
       leading: Padding(padding: const EdgeInsets.all(6), child: ArcadeIconButton(tooltip:'Leave practice',icon:Icons.arrow_back_rounded,
         onPressed:()=>Navigator.pop(context,false),palette:p))),
@@ -76,7 +77,7 @@ class _PracticeScreenState extends State<PracticeScreen> {
         },primary:true)],
       const SizedBox(height:12),Text('Take your time. Practice does not change your scores, coins or saved game.',textAlign:TextAlign.center,
         style:TextStyle(color:p.muted,fontSize:12,height:1.4)),
-    ])));
+    ]))));
 }
 class _PracticePainter extends CustomPainter {
   _PracticePainter(this.game,this.palette,this.skin);

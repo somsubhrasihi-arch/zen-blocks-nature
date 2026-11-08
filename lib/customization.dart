@@ -80,3 +80,13 @@ const gamePalettes = [toyPalette, neonPalette,
 
 GamePalette paletteForId(String? id) => gamePalettes.firstWhere((theme) => theme.id == id,
   orElse: () => toyPalette);
+
+/// Theme selection changes pieces; shared surfaces remain consistent with Home.
+extension PlayfulSurfaces on GamePalette {
+  GamePalette get playful => GamePalette(id: id, name: name,
+    background: toyPalette.background, panel: const Color(0xFFFFFBF4),
+    control: const Color(0xFFECE2F3), accent: const Color(0xFFB32972),
+    muted: const Color(0xFF695775), grid: const Color(0xFFDDD2E7),
+    board: const Color(0xFFFFFBF4), overlay: const Color(0xF7FFFBF4),
+    stats: const [Color(0xFFFFFBF4), Color(0xFFFFFBF4)], blocks: blocks);
+}

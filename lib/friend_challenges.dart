@@ -3,6 +3,7 @@ import 'package:share_plus/share_plus.dart';
 
 import 'arcade_ui.dart';
 import 'customization.dart';
+import 'playful_style.dart';
 import 'engagement.dart';
 import 'play_modes.dart';
 import 'progress_store.dart';
@@ -34,7 +35,7 @@ class _FriendChallengesState extends State<FriendChallenges> {
   final code = TextEditingController();
   String? error;
   bool sharing = false;
-  GamePalette get p => widget.palette;
+  GamePalette get p => widget.palette.playful;
   @override
   void dispose() {
     code.dispose();
@@ -92,7 +93,7 @@ class _FriendChallengesState extends State<FriendChallenges> {
         children: children,
       ),
     );
-    return Scaffold(
+    return Theme(data: buddyTheme(p), child: Scaffold(
       backgroundColor: p.background.first,
       appBar: AppBar(
         title: const Text('Friend challenges'),
@@ -129,7 +130,7 @@ class _FriendChallengesState extends State<FriendChallenges> {
               SelectableText(
                 friendChallengeCode(today),
                 style: TextStyle(
-                  color: p.blocks[1],
+                  color: buddyGold,
                   fontSize: 21,
                   fontWeight: FontWeight.w800,
                 ),
@@ -245,6 +246,6 @@ class _FriendChallengesState extends State<FriendChallenges> {
           ],
         ),
       ),
-    );
+    ));
   }
 }
