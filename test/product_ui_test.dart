@@ -97,6 +97,7 @@ void main() {
     await tester.tap(find.text('Play Classic')); await tester.pump();
     final dynamic state = tester.state(find.byType(GameScreen));
     state.joystickEnabled = false;
+    state.game.reset();
     state.game.start(playMode: PlayMode.sprint);
     await tester.pump();
     final frame = tester.getRect(find.byKey(const ValueKey('playing-field-frame')));
@@ -108,10 +109,12 @@ void main() {
     expect(find.text('DOWN'), findsOneWidget);
     expect(tester.takeException(), isNull);
     await capture(tester, '08-sprint-side-stats');
+    state.game.reset();
     state.game.start(playMode: PlayMode.daily);
     await tester.pump();
     expect(find.text('GOAL'), findsOneWidget);
     expect(tester.takeException(), isNull);
+    state.game.reset();
     state.game.start(journeyStage: stageForId(1));
     await tester.pump();
     expect(find.text('GOAL'), findsOneWidget);
