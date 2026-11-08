@@ -9,6 +9,7 @@ import 'arcade_ui.dart';
 import 'campaign.dart';
 import 'cosmetic_paint.dart';
 import 'customization.dart';
+import 'playful_style.dart';
 import 'progress_store.dart';
 import 'cosmetic_preview.dart';
 
@@ -47,13 +48,13 @@ class _AdventureHubState extends State<AdventureHub> {
 
   late int selectedWorld = widget.progress.data.recommendedStage?.world ?? 0;
   String shopFilter = 'All';
-  GamePalette get p => widget.palette;
+  GamePalette get p => widget.palette.playful;
   PlayerProgress get data => widget.progress.data;
   Widget button(String text, IconData icon, VoidCallback? action) => ArcadeButton(label: text, icon: icon,
     onPressed: action, accent: p.accent, surface: p.control, primary: true, height: 48);
   Widget card(Widget child) => Container(margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(16),
     decoration: BoxDecoration(color: p.panel, borderRadius: BorderRadius.circular(28),
-      border: Border.all(color: Colors.white.withValues(alpha: .16)),
+      border: Border.all(color: const Color(0xFFE8DEEF)),
       boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .10), offset: const Offset(0, 4))]), child: child);
   void message(String text) {
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
@@ -116,11 +117,11 @@ class _AdventureHubState extends State<AdventureHub> {
     builder: (context) => AnimatedBuilder(animation: widget.monetization ?? widget.progress,
       builder: (_, child) => SingleChildScrollView(padding: const EdgeInsets.all(18), child: Column(mainAxisSize: MainAxisSize.min, children: storeCards()))));
   List<Widget> bundles() => [
-    Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text('STYLE COLLECTIONS', style: TextStyle(color: p.accent, fontWeight: FontWeight.w800))),
+    Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: Text('STYLE COLLECTIONS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800))),
     for (final bundle in shopBundles.where((b) => shopFilter == 'Owned' ? b.priceFor(data.owned) == 0 : shopFilter == 'Affordable' ? b.priceFor(data.owned) > 0 && b.priceFor(data.owned) <= data.coins : true)) card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text(bundle.name, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
       const SizedBox(height: 8), Text(bundle.items.map((id) => itemForId(id)!.name).join(' + '), style: TextStyle(color: p.muted)),
-      const SizedBox(height: 10), Text(bundle.priceFor(data.owned) == 0 ? 'Collection complete' : '${bundle.priceFor(data.owned)} coins together · ${bundle.individualPrice(data.owned)} individually', style: TextStyle(color: p.blocks[1])),
+      const SizedBox(height: 10), Text(bundle.priceFor(data.owned) == 0 ? 'Collection complete' : '${bundle.priceFor(data.owned)} coins together · ${bundle.individualPrice(data.owned)} individually', style: TextStyle(color: buddyGold)),
       const SizedBox(height: 8), Text('20% less than the individual coin prices. You only pay for items you do not own.', style: TextStyle(color: p.muted, fontSize: 12)),
       const SizedBox(height: 12), button(bundle.priceFor(data.owned) == 0 ? 'Owned' : 'Unlock collection', Icons.collections_rounded,
         busy || bundle.priceFor(data.owned) == 0 || data.coins < bundle.priceFor(data.owned) ? null : () => buyBundle(bundle)),
@@ -129,12 +130,12 @@ class _AdventureHubState extends State<AdventureHub> {
   ];
 
   @override
-  Widget build(BuildContext context) => AnimatedBuilder(animation: widget.progress, builder: (context, _) => Scaffold(
+  Widget build(BuildContext context) => AnimatedBuilder(animation: widget.progress, builder: (context, _) => Theme(data: buddyTheme(p), child: Scaffold(
     backgroundColor: p.background.first,
     appBar: AppBar(backgroundColor: p.panel, leading: Padding(padding: const EdgeInsets.all(6),
       child: ArcadeIconButton(tooltip: 'Back', icon: Icons.arrow_back_rounded, onPressed: () => Navigator.pop(context), palette: p)), title: Text(['Journey', 'Block Shop', 'Achievements', 'Daily rewards & lives'][tab]),
       actions: [Padding(padding: const EdgeInsets.only(right: 16), child: Center(child: Row(children: [
-        Icon(Icons.monetization_on_rounded, color: p.blocks[1], size: 22), const SizedBox(width: 5),
+        Icon(Icons.monetization_on_rounded, color: buddyGold, size: 22), const SizedBox(width: 5),
         Text('${data.coins}', style: const TextStyle(fontWeight: FontWeight.w800)),
       ])))]),
     bottomNavigationBar: NavigationBar(backgroundColor: p.panel, indicatorColor: p.accent.withValues(alpha: .25),
@@ -145,13 +146,13 @@ class _AdventureHubState extends State<AdventureHub> {
         NavigationDestination(icon: Icon(Icons.card_giftcard_rounded), label: 'Rewards'),
       ]),
     body: SafeArea(child: ListView(key: ValueKey('hub-$tab-$selectedWorld'), padding: const EdgeInsets.all(16), children: tab == 0 ? journey() : tab == 1 ? shop() : tab == 2 ? trophies() : rewards())),
-  ));
+  )));
 
   List<Widget> journey() => [
     card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text('Your next adventure', style: TextStyle(color: p.accent, fontSize: 22, fontWeight: FontWeight.w800)),
       const SizedBox(height: 8), Text('${data.stars.length} stages complete  •  ${data.totalStars} stars'),
-      const SizedBox(height: 12), LinearProgressIndicator(value: (data.stars.keys.where((id) => (id - 1) ~/ 10 == selectedWorld).length / 10).clamp(0, 1), color: p.blocks[1], backgroundColor: p.control),
+      const SizedBox(height: 12), LinearProgressIndicator(value: (data.stars.keys.where((id) => (id - 1) ~/ 10 == selectedWorld).length / 10).clamp(0, 1), color: buddyGold, backgroundColor: p.control),
       const SizedBox(height: 12), Text('Complete objectives to earn coins. Use fewer blocks for more stars.', style: TextStyle(color: p.muted, height: 1.4)),
       if (data.recommendedStage != null) ...[const SizedBox(height: 12),
         Text('Up next: Stage ${data.recommendedStage!.id} · ${data.recommendedStage!.name}', style: TextStyle(color: p.accent, fontWeight: FontWeight.w700)),
@@ -166,8 +167,8 @@ class _AdventureHubState extends State<AdventureHub> {
     ])),
     for (final world in [selectedWorld]) ...[
       Padding(padding: const EdgeInsets.fromLTRB(4, 16, 4, 12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('WORLD ${world + 1} · ${worldName(world)}', style: TextStyle(color: p.accent, fontWeight: FontWeight.w800, letterSpacing: .8)),
-        const SizedBox(height: 4), Text('${world < 3 ? worldDescriptions[world] : 'The adventure continues'}${world == 0 ? '' : ' · ${world < 3 ? [0,12,28][world] : 28} stars to enter'}', style: TextStyle(color: p.muted, fontSize: 12)),
+        Text('WORLD ${world + 1} · ${worldName(world)}', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, letterSpacing: .8)),
+        const SizedBox(height: 4), Text('${world < 3 ? worldDescriptions[world] : 'The adventure continues'}${world == 0 ? '' : ' · ${world < 3 ? [0,12,28][world] : 28} stars to enter'}', style: TextStyle(color: Colors.white, fontSize: 12)),
       ])),
       for (final stage in stagesInWorld(world)) stageCard(stage),
     ],
@@ -179,7 +180,7 @@ class _AdventureHubState extends State<AdventureHub> {
         decoration: BoxDecoration(color: p.accent.withValues(alpha: unlocked ? .2 : .07), borderRadius: BorderRadius.circular(12)),
         child: unlocked ? Text('${stage.id}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 19)) : Icon(Icons.lock_rounded, color: p.muted, size: 20)),
         const SizedBox(width: 12), Expanded(child: Text(stage.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17))),
-        for (var i = 0; i < 3; i++) Icon(i < stars ? Icons.star_rounded : Icons.star_outline_rounded, color: i < stars ? p.blocks[1] : p.muted, size: 19),
+        for (var i = 0; i < 3; i++) Icon(i < stars ? Icons.star_rounded : Icons.star_outline_rounded, color: i < stars ? buddyGold : p.muted, size: 19),
       ]),
       const SizedBox(height: 12), Text(stage.objective, style: TextStyle(color: p.accent, fontWeight: FontWeight.w600)),
       const SizedBox(height: 5), Text(stage.starHint, style: TextStyle(color: p.muted, fontSize: 11, height: 1.4)),
@@ -200,7 +201,7 @@ class _AdventureHubState extends State<AdventureHub> {
       ]),
     ])),
     for (final kind in CosmeticKind.values) ...[
-      Padding(padding: const EdgeInsets.fromLTRB(4, 12, 4, 12), child: Text(kind == CosmeticKind.skin ? 'BLOCK SKINS' : 'CLEAR EFFECTS', style: TextStyle(color: p.accent, fontWeight: FontWeight.w800, letterSpacing: 1))),
+      Padding(padding: const EdgeInsets.fromLTRB(4, 12, 4, 12), child: Text(kind == CosmeticKind.skin ? 'BLOCK SKINS' : 'CLEAR EFFECTS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, letterSpacing: 1))),
       for (final item in shopItems.where((i) => i.kind == kind && visible(i))) shopCard(item),
     ],
     if (!shopItems.any(visible)) card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -214,7 +215,7 @@ class _AdventureHubState extends State<AdventureHub> {
       const SizedBox(height: 8), Text('Classic: 5 coins per cleared line. Journey: first clears and better stars. Sprint: completion, speed and personal bests. Daily Challenge: 120–180 coins once per UTC day.', style: TextStyle(color: p.muted, fontSize: 12, height: 1.5)),
       const SizedBox(height: 8), Text('Journey replay and repeat Sprint payouts share a 100-coin daily limit. First clears, star improvements, records and achievements are extra.', style: TextStyle(color: p.muted, fontSize: 12, height: 1.5)),
     ])),
-    Center(child: Text('Progress and coins are saved on this device.', style: TextStyle(color: p.muted, fontSize: 11))),
+    Center(child: Text('Progress and coins are saved on this device.', style: TextStyle(color: Colors.white, fontSize: 11))),
     const SizedBox(height: 12),
   ];
   List<Widget> storeCards() {
@@ -266,7 +267,7 @@ class _AdventureHubState extends State<AdventureHub> {
           Text('Visit collection', style: TextStyle(color: p.accent, fontSize: 21, fontWeight: FontWeight.w800)),
           const SizedBox(height: 12), Row(children: [for (var i = 1; i <= 7; i++) Expanded(child: Padding(padding: const EdgeInsets.symmetric(horizontal: 2),
             child: CircleAvatar(radius: 16, backgroundColor: i <= stamps ? p.accent : p.control,
-              child: Text('$i', style: TextStyle(color: i <= stamps ? p.background.first : p.muted, fontWeight: FontWeight.w800)))))]),
+              child: Text('$i', style: TextStyle(color: i <= stamps ? Colors.white : p.muted, fontWeight: FontWeight.w800)))))]),
           const SizedBox(height: 12), Text('Every 7th visit gift is 100 coins. Missed days keep your collection progress. Claim once per UTC day.', style: TextStyle(color: p.muted, height: 1.4)),
         ])),
         card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -275,7 +276,7 @@ class _AdventureHubState extends State<AdventureHub> {
         ])),
         for (final task in dailyActivitiesFor(today)) card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(task.title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 8), Text('+${task.id == 'visit' ? visitReward(data.giftDays - (current && data.activityClaims.contains('visit') ? 1 : 0)) : task.coins} coins${task.target == 0 ? '' : ' · ${(current ? data.activityValue(task.counter) : 0).clamp(0, task.target)}/${task.target}'}', style: TextStyle(color: p.blocks[1])),
+          const SizedBox(height: 8), Text('+${task.id == 'visit' ? visitReward(data.giftDays - (current && data.activityClaims.contains('visit') ? 1 : 0)) : task.coins} coins${task.target == 0 ? '' : ' · ${(current ? data.activityValue(task.counter) : 0).clamp(0, task.target)}/${task.target}'}', style: TextStyle(color: buddyGold)),
           const SizedBox(height: 12), button(current && data.activityClaims.contains(task.id) ? 'Claimed' : 'Claim reward', Icons.card_giftcard_rounded,
             busy || (current && data.activityClaims.contains(task.id)) || (current ? data.activityValue(task.counter) : 0) < task.target ? null : () => perform(() => widget.progress.claimActivity(task.id))),
         ])),
@@ -298,7 +299,7 @@ class _AdventureHubState extends State<AdventureHub> {
           busy || !current || data.weeklyClaims.contains(mission.id) || data.weeklyValue(mission.id) < mission.target ? null : () => perform(() => widget.progress.claimWeekly(mission.id))),
       ])),
       card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Weekly chest · +100 coins', style: TextStyle(color: p.blocks[1], fontSize: 20, fontWeight: FontWeight.w800)),
+        Text('Weekly chest · +100 coins', style: TextStyle(color: buddyGold, fontSize: 20, fontWeight: FontWeight.w800)),
         const SizedBox(height: 8), Text('$completed/3 mission rewards collected'), const SizedBox(height: 12),
         button(current && data.weeklyClaims.contains('chest') ? 'Chest collected' : 'Open weekly chest', Icons.inventory_2_rounded,
           busy || completed < 3 || data.weeklyClaims.contains('chest') ? null : () => perform(() => widget.progress.claimWeekly('chest'))),
@@ -339,9 +340,9 @@ class _AdventureHubState extends State<AdventureHub> {
       const SizedBox(height: 8), Text('${data.earned.length}/${achievements.length} unlocked · Rewards arrive automatically after a finished run.', style: TextStyle(color: p.muted, height: 1.4)),
     ])),
     for (final a in achievements) card(Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [Icon(data.earned.contains(a.id) ? Icons.emoji_events_rounded : Icons.workspace_premium_outlined, color: data.earned.contains(a.id) ? p.blocks[1] : p.muted),
+      Row(children: [Icon(data.earned.contains(a.id) ? Icons.emoji_events_rounded : Icons.workspace_premium_outlined, color: data.earned.contains(a.id) ? buddyGold : p.muted),
         const SizedBox(width: 10), Expanded(child: Text(a.name, style: const TextStyle(fontWeight: FontWeight.w800))),
-        Text('+${a.reward}', style: TextStyle(color: p.blocks[1], fontWeight: FontWeight.w800))]),
+        Text('+${a.reward}', style: TextStyle(color: buddyGold, fontWeight: FontWeight.w800))]),
       const SizedBox(height: 10), Text(a.detail, style: TextStyle(color: p.muted)), const SizedBox(height: 12),
       LinearProgressIndicator(value: (data.achievementValue(a.id)/a.target).clamp(0, 1).toDouble(), color: p.accent, backgroundColor: p.control),
       const SizedBox(height: 8), Text(data.earned.contains(a.id) ? 'Unlocked · Coins awarded' : '${data.achievementValue(a.id).clamp(0, a.target)}/${a.target}',

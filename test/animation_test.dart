@@ -89,35 +89,13 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  testWidgets('aurora moves without rebuilding the board and respects effects setting', (tester) async {
+  testWidgets('playful background stays calm without rebuilding the board', (tester) async {
     await mountGame(tester, themeId: 'neon');
     final board = find.byWidgetPredicate((w) => w is CustomPaint && w.painter is BoardPainter);
     final before = tester.widget(board);
-    final aurora = tester.widgetList<CustomPaint>(find.byType(CustomPaint))
-        .map((w) => w.painter).whereType<AuroraPainter>().single.animation;
-    final initial = aurora.value;
+    expect(tester.widgetList<CustomPaint>(find.byType(CustomPaint)).map((w) => w.painter).whereType<AuroraPainter>(), isEmpty);
     await tester.pump(const Duration(milliseconds: 100));
-    expect(aurora.value, isNot(initial));
     expect(identical(tester.widget(board), before), isTrue);
-    await tester.tap(find.byTooltip('Settings'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    await tester.ensureVisible(find.text('Line-clear effects'));
-    await tester.pump();
-    await tester.tap(find.text('Line-clear effects'));
-    await tester.pump();
-    final stopped = aurora.value;
-    await tester.pump(const Duration(milliseconds: 400));
-    expect(aurora.value, stopped);
-    await tester.tap(find.text('Line-clear effects'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 100));
-    expect(aurora.value, stopped);
-    await tester.tap(find.byTooltip('Done'));
-    await tester.pump(); await tester.pump(const Duration(milliseconds: 400));
-    await tester.tap(find.text('Resume'));
-    await tester.pump(); await tester.pump(const Duration(milliseconds: 100));
-    expect(aurora.value, isNot(stopped));
     await tester.pumpWidget(const SizedBox.shrink());
   });
 

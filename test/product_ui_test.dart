@@ -155,7 +155,7 @@ void main() {
     await capture(tester, '04-theme-menu');
     Navigator.of(tester.element(find.byType(GameScreen))).pop();
     await tester.pump(); await tester.pump(const Duration(milliseconds: 350));
-    await tester.scrollUntilVisible(find.text('T-BLOCK • 1.11.0'), 250, scrollable: find.byType(Scrollable).last); await tester.pump();
+    await tester.scrollUntilVisible(find.text('T-BLOCK • 1.12.0'), 250, scrollable: find.byType(Scrollable).last); await tester.pump();
     await capture(tester, '05-settings-controls');
     expect(find.text('Settings'), findsWidgets);
     expect(tester.takeException(), isNull);

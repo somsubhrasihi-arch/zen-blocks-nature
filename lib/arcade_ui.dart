@@ -109,8 +109,8 @@ class GameBoardFrame extends StatelessWidget {
   final Widget child;
   @override
   Widget build(BuildContext context) => RepaintBoundary(key: const ValueKey('board-frame-capture'),
-    child: Container(key: const ValueKey('playing-field-frame'), padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(color: palette.accent, borderRadius: BorderRadius.circular(18),
+    child: Container(key: const ValueKey('playing-field-frame'), padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(color: palette.accent, borderRadius: BorderRadius.circular(24),
         boxShadow: [BoxShadow(color: palette.accent.withValues(alpha: .22), blurRadius: 10, spreadRadius: 1)]),
       child: ClipRRect(borderRadius: BorderRadius.circular(15),
         child: ColoredBox(color: palette.board, child: child)),

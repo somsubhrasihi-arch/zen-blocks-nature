@@ -552,10 +552,9 @@ class ToyIslandPainter extends CustomPainter {
       }
     }
 
-    block(92, 91, const Color(0xFFFFC44D));
-    block(138, 91, const Color(0xFFFFC44D), face: true);
-    block(184, 91, const Color(0xFFFFC44D));
-    block(138, 45, const Color(0xFFFFC44D));
+    // The original upright tower is rotated 180 degrees into the brand T.
+    block(92, 45, const Color(0xFFFFC44D)); block(138, 45, const Color(0xFFFFC44D));
+    block(184, 45, const Color(0xFFFFC44D)); block(138, 91, const Color(0xFFFFC44D), face: true);
     block(46, 91, const Color(0xFF48C9CF), face: true);
     block(230, 91, const Color(0xFFF487B1), face: true);
     for (final point in [
