@@ -52,8 +52,9 @@ class _AdventureHubState extends State<AdventureHub> {
   Widget button(String text, IconData icon, VoidCallback? action) => ArcadeButton(label: text, icon: icon,
     onPressed: action, accent: p.accent, surface: p.control, primary: true, height: 48);
   Widget card(Widget child) => Container(margin: const EdgeInsets.only(bottom: 12), padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(color: p.panel, borderRadius: BorderRadius.circular(22),
-      border: Border.all(color: p.accent.withValues(alpha: .22))), child: child);
+    decoration: BoxDecoration(color: p.panel, borderRadius: BorderRadius.circular(28),
+      border: Border.all(color: Colors.white.withValues(alpha: .16)),
+      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .10), offset: const Offset(0, 4))]), child: child);
   void message(String text) {
     if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }

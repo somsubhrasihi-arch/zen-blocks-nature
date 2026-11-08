@@ -37,6 +37,7 @@ void main() {
   testWidgets('settings pause Sprint and leave an explicit Resume action',(tester)async{
     await tester.binding.setSurfaceSize(const Size(412,900));addTearDown(()=>tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(ZenBlocksApp(audio:GameAudio(backend:FakeAudioBackend())));await tester.pump();await tester.pump();
+    await tester.tap(find.text('Challenges'));await tester.pump();
     await tester.tap(find.text('Sprint'));await tester.pump();await tester.pump(const Duration(milliseconds:500));
     await tester.tap(find.text('Start Sprint'));await tester.pump();await tester.pump(const Duration(milliseconds:700));await tester.pump();
     final dynamic state=tester.state(find.byType(GameScreen));
@@ -98,7 +99,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(360,640));addTearDown(()=>tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(RepaintBoundary(key:captureKey,child:ZenBlocksApp(audio:GameAudio(backend:FakeAudioBackend()))));await tester.pump();await tester.pump();
     expect(tester.takeException(),isNull);await capture(tester,'19-home-small-large-text');
-    await tester.ensureVisible(find.text('Shop · 0'));await tester.tap(find.text('Shop · 0'));
+    await tester.ensureVisible(find.text('Shop'));await tester.tap(find.text('Shop'));
     await tester.pump();await tester.pump(const Duration(milliseconds:700));await tester.pump();
     expect(tester.takeException(),isNull);await capture(tester,'20-shop-small-large-text');await tester.pumpWidget(const SizedBox.shrink());
   });

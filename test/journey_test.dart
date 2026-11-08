@@ -169,7 +169,7 @@ void main() {
     expect(state.game.stage.id,2);expect(state.game.completed,false);
     await tester.tap(find.byTooltip('Pause'));await tester.pump();
     await tester.tap(find.text('Home'));await tester.pump();
-    await tester.ensureVisible(find.text('Shop · 155'));await tester.tap(find.text('Shop · 155'));
+    await tester.ensureVisible(find.text('Shop'));await tester.tap(find.text('Shop'));
     await tester.pump();await tester.pump(const Duration(milliseconds:350));
     await capture(tester,'10-shop');
     await tester.ensureVisible(find.text('120 coins · Unlock'));

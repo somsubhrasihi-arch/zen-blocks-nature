@@ -10,6 +10,7 @@ import 'session_store.dart';
 import 'customization.dart';
 import 't_block_mark.dart';
 import 'arcade_ui.dart';
+import 'playful_home.dart';
 import 'campaign.dart';
 import 'progress_store.dart';
 import 'journey_ui.dart';
@@ -80,7 +81,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   final ZenGame game = ZenGame();
   late final GameAudio audio;
   bool musicEnabled = true;
-  GamePalette _palette = neonPalette;
+  GamePalette _palette = toyPalette;
   String _musicTrack = 'aurora';
   ThemeData get _themeData => ThemeData(useMaterial3: true, brightness: Brightness.dark,
     scaffoldBackgroundColor: _palette.background.first, colorSchemeSeed: _palette.accent,
@@ -427,65 +428,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
       ])),
     ]));
 
-  Widget _homeMetric(String label, String value, IconData icon) => Expanded(child: FittedBox(fit: BoxFit.scaleDown,
-    child: Row(children: [Icon(icon, color: _palette.blocks[1], size: 24), SizedBox(width: 8),
-      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: TextStyle(color: _palette.muted, fontSize: 9, letterSpacing: 1.2)),
-        Text(value, style: TextStyle(color: cream, fontSize: 22, fontWeight: FontWeight.w800)),
-      ])])));
-
-  Widget _buildHome() => Center(child: SingleChildScrollView(child: Padding(
-    padding: EdgeInsets.all(24), child: ConstrainedBox(constraints: BoxConstraints(maxWidth: 420),
-    child: Column(mainAxisSize: MainAxisSize.min, children: [
-      Row(mainAxisAlignment: MainAxisAlignment.center, children: [TBlockMark(size: 44, color: _palette.accent), SizedBox(width: 12),
-        Flexible(child: FittedBox(fit: BoxFit.scaleDown, child: Text('T-BLOCK', textAlign: TextAlign.center, style: TextStyle(fontSize: 32, letterSpacing: 3, fontWeight: FontWeight.w900))))]),
-      SizedBox(height: 6),
-      Text(gameTagline, style: TextStyle(color: _palette.muted, fontSize: 13, letterSpacing: 1.8)),
-      SizedBox(height: 18),
-      Container(padding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(color: _palette.panel.withValues(alpha: .7), borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: _palette.accent.withValues(alpha: .22))),
-        child: Row(children: [_homeMetric('CLASSIC BEST', '$highScore', Icons.emoji_events_rounded), SizedBox(width: 18),
-          _homeMetric('BLOCK COINS', '${progress.data.coins}', Icons.monetization_on_rounded)])),
-      SizedBox(height: 24),
-      if (_loading) Padding(padding: EdgeInsets.all(12), child: CircularProgressIndicator()),
-      if (!_loading && !_practiceCompleted) ...[
-        Row(children: [Expanded(child: Text('New here? Learn by playing.', style: TextStyle(color:_palette.muted,fontSize:12))),
-          SizedBox(width:8), SizedBox(width:100,child:_button('Practice',Icons.school_rounded,_openPractice,height:44))]),
-        SizedBox(height:12),
-      ],
-      if (_savedState != null) ...[
-        Text('${_savedState!['stageId'] != null ? 'Journey · Stage ${_savedState!["stageId"]}' : _savedState!['mode'] == 'sprint' ? 'Sprint' : _savedState!['mode'] == 'daily' ? 'Daily Challenge' : 'Classic'}  •  Score ${_savedState!["score"]}', style: TextStyle(color: _palette.muted, fontSize: 13)),
-        SizedBox(height: 12),
-        SizedBox(width: double.infinity, child: _button('Continue', Icons.play_arrow_rounded, _loading ? null : _continueGame, primary: true, height: 62)),
-        SizedBox(height: 10),
-      ],
-      SizedBox(width: double.infinity, child: _button(_savedState == null ? 'Play Classic' : 'Start new game',
-        Icons.bolt_rounded, _loading ? null : _startNewGame, primary: _savedState == null,
-        accent: _savedState == null ? _palette.accent : _palette.blocks[2], height: 62, subtitle: 'Endless play · Set your own best')),
-      SizedBox(height: 12),
-      SizedBox(width: double.infinity, child: _button('Journey · Stage ${progress.data.recommendedStage?.id ?? 1}', Icons.route_rounded,
-        _loading ? null : () => _openHub(), accent: _palette.blocks[2], height: 62, subtitle: 'Unlimited worlds · Collect stars')),
-      SizedBox(height: 10),
-      Row(children: [Expanded(child: _button('Sprint', Icons.timer_rounded, _loading ? null : () => _showModeIntro(PlayMode.sprint), height: 62, subtitle: '40 lines · Beat the clock')),
-        SizedBox(width: 10), Expanded(child: _button('Daily Challenge', Icons.today_rounded,
-          _loading ? null : () => _showModeIntro(PlayMode.daily), accent: _palette.blocks[3], height: 62, subtitle: progress.data.canClaimDaily(utcDay(DateTime.now())) ? 'Today’s reward is ready' : 'Reward collected · Practice'))]),
-      SizedBox(height: 10),
-      Row(children: [Expanded(child: _button('Shop · ${progress.data.coins}', Icons.shopping_bag_rounded,
-          _loading ? null : () => _openHub(1), accent: _palette.blocks[1], height: 50)),
-        SizedBox(width: 10), Expanded(child: _button('Achievements', Icons.emoji_events_rounded, _loading ? null : () => _openHub(2), height: 50))]),
-      SizedBox(height: 10),
-      SizedBox(width: double.infinity, child: _button('Daily rewards & lives', Icons.card_giftcard_rounded, _loading ? null : () => _openHub(3), height: 58, subtitle: 'Visit collection · Daily quests · Weekly chest')),
-      SizedBox(height: 10),
-      SizedBox(width: double.infinity, child: _button('Friend challenges', Icons.people_alt_rounded, _loading ? null : _openFriends, height: 50)),
-      SizedBox(height: 14),
-      Row(children: [
-        Expanded(child: _button('How to play', Icons.sports_esports_rounded, _showHowToPlay, height: 50)),
-        SizedBox(width: 10), Expanded(child: Tooltip(message: 'Settings', child: _button('Settings', Icons.tune_rounded, _showSettings, height: 50))),
-      ]),
-      SizedBox(height: 22), Text('v$appVersion', style: TextStyle(color: _palette.muted.withValues(alpha: .65), fontSize: 10, letterSpacing: 1)),
-    ])),
-  )));
+  Widget _buildHome() => PlayfulHome(palette: _palette, coins: progress.data.coins,
+    best: highScore, stage: progress.data.recommendedStage?.id ?? 1,
+    loading: _loading, hasSave: _savedState != null, showPractice: !_loading && !_practiceCompleted,
+    onPlay: _startNewGame, onContinue: _continueGame, onJourney: () => _openHub(),
+    onSprint: () => _showModeIntro(PlayMode.sprint), onDaily: () => _showModeIntro(PlayMode.daily),
+    onShop: () => _openHub(1), onRewards: () => _openHub(3), onFriends: _openFriends,
+    onAchievements: () => _openHub(2), onSettings: _showSettings,
+    onHelp: _showHowToPlay, onPractice: _openPractice);
 
   void _showModeIntro(PlayMode mode) {
     final now = DateTime.now().toUtc(), today = utcDay(DateTime.now());
@@ -828,9 +778,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver, Ti
   Widget build(BuildContext context) => Theme(data: _themeData, child: PopScope(canPop: _home,
     onPopInvokedWithResult: (didPop, result) { if (!didPop) _returnHome(); },
     child: Scaffold(body: Container(
-      decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: _palette.background)),
+      decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: _home ? toyPalette.background : _palette.background)),
       child: Stack(children: [
-        Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: AuroraPainter(aurora, game.level, effectsEnabled && _motionAllowed, palette: _palette))))),
+        Positioned.fill(child: IgnorePointer(child: RepaintBoundary(child: CustomPaint(painter: _home || _palette.id == 'toy' ? const PlayfulBackdrop() : AuroraPainter(aurora, game.level, effectsEnabled && _motionAllowed, palette: _palette))))),
         SafeArea(child: _home ? _buildHome() : _buildGame()),
       ]),
     )),
